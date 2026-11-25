@@ -12,7 +12,9 @@ From the 1980 original:
 2. **The escalation ladder.** Score drives the mix: slow tanks → missiles join in → supertanks dominate at high scores.
 3. **Distinct personalities.** Slow tank: dumb, direct, sluggish. Missile: fast, committed, scary. Supertank: fast, aggressive, shoots on the move.
 4. **The periodic flyby.** A radar-invisible aircraft crosses on a schedule, warbling, worth bonus points. Ours is a bomber rather than the original's harmless saucer (§5.4) — the one deliberate departure.
-5. **Enemies come to you.** They spawn far away and approach; obstacles matter; the fight happens at medium range in open ground.
+5. **Enemies come to you.** They spawn at 100–140 m — inside sight range, so
+   they acquire you immediately — and approach; obstacles matter; the fight
+   happens at medium range in open ground.
 6. **No retreat.** Enemies fight to the death (the original's only exception was the 100,000-point easter egg — kept as a stretch homage).
 
 ## 2. What "toned down" means (the fairness rules)
