@@ -5,8 +5,21 @@
  * See docs/learn/m1.md for the concepts.
  */
 import * as THREE from 'three';
-import { BLOCK_SIZE, createWorld, stepWorld, TICK_DT, type SimEvent, type TankCommand } from '@vectorzone/sim';
+import {
+  BLOCK_SIZE,
+  createWorld,
+  stepWorld,
+  TICK_DT,
+  traceShot,
+  turretForward,
+  turretToWorld,
+  MATCH_TICKS,
+  SHELL_COOLDOWN,
+  type SimEvent,
+  type TankCommand,
+} from '@vectorzone/sim';
 import { buildEntityGeometry } from './geometry';
+import { createHud } from './hud';
 import { bindInput, readCommand } from './input';
 import { PALETTES } from './palette';
 import { ParticlePool } from './particles';
@@ -124,6 +137,18 @@ debugLines.frustumCulled = false;
 debugLines.visible = false;
 scene.add(debugLines);
 
+// line-of-fire: predicted trajectory + impact tick (user direction 2026-11-25)
+const trajMat = new THREE.LineBasicMaterial({ color: 0x1d7a3a, transparent: true, opacity: 0.5 });
+const trajPos = new Float32Array(18);
+const trajGeo = new THREE.BufferGeometry();
+trajGeo.setAttribute('position', new THREE.BufferAttribute(trajPos, 3).setUsage(THREE.DynamicDrawUsage));
+const trajLines = new THREE.LineSegments(trajGeo, trajMat);
+trajLines.frustumCulled = false;
+scene.add(trajLines);
+
+const hud = createHud();
+let lastBombBlip = -1e9;
+
 function crossGeometry(size: number): THREE.BufferGeometry {
   const s = size;
   const p = [-s, 0, 0, s, 0, 0, 0, 0, -s, 0, 0, s, 0, -s, 0, 0, s, 0];
@@ -133,14 +158,18 @@ function crossGeometry(size: number): THREE.BufferGeometry {
 }
 
 function bomberGeometry(): THREE.BufferGeometry {
-  const p: number[] = [];
-  const S = 12;
-  for (let i = 0; i < S; i++) {
-    const a = (i / S) * Math.PI * 2;
-    const b = ((i + 1) / S) * Math.PI * 2;
-    p.push(Math.sin(a) * 3, 0, Math.cos(a) * 3, Math.sin(b) * 3, 0, Math.cos(b) * 3);
-    p.push(0, 0.8, 0, Math.sin(a) * 1.4, 0.8, Math.cos(a) * 1.4);
-  }
+  // a basic aeroplane, not a saucer (user direction 2026-11-25):
+  // fuselage, straight wings, tailplane, fin
+  const p = [
+    0, 0, -2.4, 0, 0, 2.4, // fuselage
+    0, 0.25, 1.5, 0, 0.25, 2.1, // nose tick
+    -3.2, 0, 0.2, 3.2, 0, 0.2, // main wing
+    -3.2, 0, 0.2, -3.2, 0.3, 0.0, // wingtip fences
+    3.2, 0, 0.2, 3.2, 0.3, 0.0,
+    -1.2, 0, -2.1, 1.2, 0, -2.1, // tailplane
+    0, 0, -2.2, 0, 0.9, -2.3, // fin
+    0, 0.9, -2.3, 0, 0.5, -1.7,
+  ];
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3));
   return g;
@@ -179,6 +208,7 @@ function applySettings(s: Settings): void {
   const P = PALETTES[s.palette % PALETTES.length];
   edgeMat.color.setHex(P.world);
   rubbleEdgeMat.color.setHex(P.rubble);
+  trajMat.color.setHex(P.dim);
   scen.mountainMat.color.setHex(P.dim);
   scen.volcanoMat.color.setHex(P.dim);
   scen.moonMat.color.setHex(P.moon);
@@ -196,6 +226,7 @@ function applySettings(s: Settings): void {
   tint.smoke = [d.r * 0.6, d.g * 0.6, d.b * 0.6];
   stats.style.color = P.hud;
   stats.style.textShadow = `0 0 6px ${P.hud}99`;
+  document.getElementById('alerts')!.style.color = P.hud;
   post.bloom.strength = s.bloom;
   const u = post.crt.uniforms;
   u.uScan.value = 0.3 * s.crt;
@@ -486,6 +517,12 @@ function frame(now: number): void {
 
   // combat events → particles & scorch rings
   for (const ev of evQueue) {
+    if (ev.kind === 'superSpawn') hud.alert('SUPERTANK INBOUND');
+    else if (ev.kind === 'bomberInbound') hud.alert('BOMBER RUN');
+    else if (ev.kind === 'volcanoRumble') hud.alert('VOLCANO RUMBLING — ERUPTION IMMINENT');
+    else if (ev.kind === 'volcanoErupt') hud.alert('ERUPTION');
+    else if (ev.kind === 'matchEnd') hud.alert('MATCH COMPLETE');
+    else if (ev.kind === 'bombTelegraph') lastBombBlip = now;
     if (ev.kind === 'fire') {
       for (let i = 0; i < 8; i++) {
         smoke.spawn(
@@ -565,6 +602,45 @@ function frame(now: number): void {
 
   renderer.info.reset();
   post.render(now / 1000);
+
+  // line-of-fire sight: muzzle → predicted first impact
+  if (tank.alive) {
+    const dir = turretForward(tank);
+    const muzzle = turretToWorld(tank, [0, BLOCK_SIZE, (tank.turret.size.z / 2) * BLOCK_SIZE + 0.15]);
+    const tr = traceShot(world, muzzle, dir, 400, 0);
+    trajPos[0] = muzzle[0]; trajPos[1] = muzzle[1]; trajPos[2] = muzzle[2];
+    trajPos[3] = tr.pos[0]; trajPos[4] = tr.pos[1]; trajPos[5] = tr.pos[2];
+    // impact cross
+    const s = 0.5;
+    trajPos[6] = tr.pos[0] - s; trajPos[7] = tr.pos[1]; trajPos[8] = tr.pos[2];
+    trajPos[9] = tr.pos[0] + s; trajPos[10] = tr.pos[1]; trajPos[11] = tr.pos[2];
+    trajPos[12] = tr.pos[0]; trajPos[13] = tr.pos[1]; trajPos[14] = tr.pos[2] - s;
+    trajPos[15] = tr.pos[0]; trajPos[16] = tr.pos[1]; trajPos[17] = tr.pos[2] + s;
+    (trajGeo.attributes.position as THREE.BufferAttribute).needsUpdate = true;
+    trajLines.visible = true;
+  } else {
+    trajLines.visible = false;
+  }
+
+  // HUD: band + radar + reticle + alerts
+  const superIds = new Set<number>();
+  for (const [id, b] of world.brains) if (b.kind === 'super') superIds.add(id);
+  hud.draw({
+    tick: world.tick,
+    heading: tank.heading,
+    x: tank.x,
+    z: tank.z,
+    known: world.awareness.get(0),
+    superIds,
+    storm: world.stormUntil > world.tick,
+    score: world.score,
+    lives: world.lives,
+    cooldownFrac: 1 - Math.min(1, tank.cooldown / SHELL_COOLDOWN),
+    bomberBlip: now - lastBombBlip < 3000,
+    secondsLeft: Math.max(0, (MATCH_TICKS - world.tick) / 60),
+    palette: PALETTES[settings.palette % PALETTES.length],
+    alive: tank.alive,
+  });
 
   frames++;
   fpsWindow += dt;

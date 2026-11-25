@@ -106,3 +106,6 @@ export {
   type Telegraph,
 } from './director';
 export { createEnemyTank } from './tank';
+export { traceShot, obstacleHitT } from './awareness';
+export { MATCH_TICKS, VOLCANO_FINAL_TICKS, BOMB_DROP_TICKS } from './combat';
+export { createVolcano, stepVolcano, type Volcano, type LavaPool } from './volcano';

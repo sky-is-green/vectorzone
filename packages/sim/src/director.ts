@@ -6,6 +6,8 @@
  */
 import { createBrain, type AiKind } from './ai';
 import { createEnemyTank } from './tank';
+import { BOMB_DROP_TICKS } from './combat';
+import { bombAftermath } from './volcano';
 import type { World } from './world';
 import type { V3 } from './raycast';
 
@@ -33,6 +35,7 @@ export interface Telegraph {
   z: number;
   impactTick: number;
   radius: number;
+  kind: 'bomb' | 'volcano';
 }
 
 export const SCORE_VALUES = { slow: 100, missile: 250, super: 500, bomber: 1000, block: 5 };
@@ -74,6 +77,7 @@ export function stepDirector(w: World): void {
         const t = createEnemyTank(w.nextId++, kind, x, z, Math.atan2(-x, -z));
         w.tanks.push(t);
         w.brains.set(t.id, createBrain(kind));
+        if (kind === 'super') w.events.push({ kind: 'superSpawn', pos: [x, 1, z] });
       }
       w.nextSpawnTick = w.tick + Math.max(240, 900 - Math.floor(w.score / 20));
     }
@@ -151,17 +155,21 @@ function stepBomber(w: World): void {
   }
   b.pos[0] += b.dir[0] * b.speed * (1 / 60);
   b.pos[2] += b.dir[2] * b.speed * (1 / 60);
-  // bombs anything beneath its path — player or AI
+  // bombs deny the flight path on a cadence, plus opportunistic target drops
   if (w.tick >= b.nextBomb) {
+    let tx = b.pos[0];
+    let tz = b.pos[2];
     for (const t of w.tanks) {
       if (!t.alive) continue;
       if (Math.hypot(t.x - b.pos[0], t.z - b.pos[2]) < 4) {
-        w.telegraphs.push({ x: t.x, z: t.z, impactTick: w.tick + TELEGRAPH_TICKS, radius: 2 });
-        w.events.push({ kind: 'bombTelegraph', pos: [t.x, 0, t.z] });
-        b.nextBomb = w.tick + 60;
+        tx = t.x;
+        tz = t.z;
         break;
       }
     }
+    w.telegraphs.push({ x: tx, z: tz, impactTick: w.tick + TELEGRAPH_TICKS, radius: 2, kind: 'bomb' });
+    w.events.push({ kind: 'bombTelegraph', pos: [tx, 0, tz] });
+    b.nextBomb = w.tick + BOMB_DROP_TICKS;
   }
   // shot down? (shooting it also reveals the shooter via gunfire rule)
   for (const sh of w.shells) {
@@ -185,5 +193,6 @@ function stepTelegraphs(w: World): void {
   w.telegraphs = w.telegraphs.filter((t) => w.tick < t.impactTick);
   for (const t of due) {
     w.pendingExplosions.push([t.x, 0.5, t.z]);
+    if (t.kind === 'volcano') bombAftermath(w, t.x, t.z);
   }
 }

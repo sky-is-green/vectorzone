@@ -6,7 +6,7 @@
 import { getCell, parseLayout, setCell, type BlockGrid } from './grid';
 import type { V3 } from './raycast';
 
-export type StructureKind = 'wall' | 'bunker' | 'tower' | 'depot';
+export type StructureKind = 'wall' | 'bunker' | 'tower' | 'depot' | 'rocks';
 
 export interface Structure {
   id: number;
@@ -44,12 +44,18 @@ const DEPOT: string[][] = [
   ['HHHH', 'HAAH', 'HAAH', 'HHHH'],
 ];
 
+const ROCKS: string[][] = [
+  ['HH.', 'HHH', '.HH'],
+  ['HH.', '.H.', '...'],
+];
+
 export function structureGrid(kind: StructureKind): BlockGrid {
   switch (kind) {
     case 'wall': return parseLayout(WALL);
     case 'bunker': return parseLayout(BUNKER);
     case 'tower': return parseLayout(TOWER);
     case 'depot': return parseLayout(DEPOT);
+    case 'rocks': return parseLayout(ROCKS);
   }
 }
 

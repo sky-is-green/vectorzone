@@ -15,7 +15,7 @@ These are holes in the current docs. None block M0–M4; each gets locked at the
 - **Deathmatch defaults**: first to **25 kills** or **10-minute** time limit (host-tunable). Player kill = +1; environment kills are neutral; block damage doesn't score. End screen with standings.
 - **Respawn**: 3 s delay, spawn ≥60 m from any enemy with LOS, then the existing 2 s grace.
 - **Host leaves → match ends** with a results screen. Host migration is genuinely hard; v1 is honest about it instead of pretending.
-- **Solo loop**: 3 lives, extra life every 10,000 points (faithful), game-over + local high score. Pause works solo, never in multiplayer.
+- **Solo loop**: 3 lives, extra life every 10,000 points (faithful), **10-minute match clock** (user direction 2026-11-25; volcano erupts only in the final two minutes), game-over + local high score. Pause works solo, never in multiplayer.
 - **Scoring (solo)**: light tank 100 · missile 250 · supertank 500 · bomber 1,000 · hunter bonus +500 · block destroyed 5. All data, tuned later.
 
 ### A2. Death & respawn experience (needed by M3/M5)

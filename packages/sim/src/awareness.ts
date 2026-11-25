@@ -5,7 +5,7 @@
  * If a player can't know it, neither can the AI.
  */
 import { raycastGrid, type V3 } from './raycast';
-import { type Tank } from './tank';
+import { worldToHull, worldToTurret, type Tank } from './tank';
 import type { Obstacle } from './arena';
 import type { World } from './world';
 
@@ -30,8 +30,8 @@ export function targetable(w: World, t: Tank): boolean {
   return t.alive && w.tick - t.spawnTick >= GRACE_TICKS;
 }
 
-/** Segment vs obstacle AABBs (slab test) — indestructible solids block sight. */
-function segmentHitsObstacle(o: V3, d: V3, len: number, ob: Obstacle): boolean {
+/** Segment vs obstacle AABBs (slab test); entry distance or null. */
+export function obstacleHitT(o: V3, d: V3, len: number, ob: Obstacle): number | null {
   let tmin = 0;
   let tmax = len;
   for (let i = 0; i < 3; i += 2) {
@@ -40,18 +40,17 @@ function segmentHitsObstacle(o: V3, d: V3, len: number, ob: Obstacle): boolean {
     const lo = c - half;
     const hi = c + half;
     if (Math.abs(d[i]) < 1e-9) {
-      if (o[i] < lo || o[i] > hi) return false;
+      if (o[i] < lo || o[i] > hi) return null;
     } else {
       let t1 = (lo - o[i]) / d[i];
       let t2 = (hi - o[i]) / d[i];
       if (t1 > t2) [t1, t2] = [t2, t1];
       tmin = Math.max(tmin, t1);
       tmax = Math.min(tmax, t2);
-      if (tmin > tmax) return false;
+      if (tmin > tmax) return null;
     }
   }
-  // height: obstacles are tall enough to block eye-level sight
-  return tmax >= 0 && tmin <= len;
+  return tmax >= 0 && tmin <= len ? tmin : null;
 }
 
 export function hasLos(w: World, from: V3, to: V3): boolean {
@@ -60,7 +59,7 @@ export function hasLos(w: World, from: V3, to: V3): boolean {
   if (len < 1e-6) return true;
   const dn: V3 = [d[0] / len, d[1] / len, d[2] / len];
   for (const ob of w.obstacles) {
-    if (segmentHitsObstacle(from, dn, len, ob)) return false;
+    if (obstacleHitT(from, dn, len, ob) !== null) return false;
   }
   for (const s of w.structures) {
     if (s.grid.cells.every((c) => !c)) continue;
@@ -69,6 +68,61 @@ export function hasLos(w: World, from: V3, to: V3): boolean {
   }
   return true;
 }
+
+/**
+ * Line-of-fire prediction: where a straight shell from `from` along `dir`
+ * lands first (grid / obstacle / ground / max range). Drives the aim sight.
+ */
+export function traceShot(
+  w: World,
+  from: V3,
+  dir: V3,
+  maxT: number,
+  skipTank: number,
+): { pos: V3; hit: 'grid' | 'obstacle' | 'ground' | 'max' } {
+  let bestT = maxT;
+  let hit: 'grid' | 'obstacle' | 'ground' | 'max' = 'max';
+  if (dir[1] < -1e-6) {
+    const t = -from[1] / dir[1];
+    if (t >= 0 && t < bestT) {
+      bestT = t;
+      hit = 'ground';
+    }
+  }
+  for (const ob of w.obstacles) {
+    const t = obstacleHitT(from, dir, bestT, ob);
+    if (t !== null && t < bestT) {
+      bestT = t;
+      hit = 'obstacle';
+    }
+  }
+  for (const s of w.structures) {
+    if (s.grid.cells.every((c) => !c)) continue;
+    const lo: V3 = [from[0] - s.x, from[1], from[2] - s.z];
+    const hits = raycastGrid(s.grid, lo, dir, bestT);
+    if (hits.length && hits[0].t < bestT) {
+      bestT = hits[0].t;
+      hit = 'grid';
+    }
+  }
+  for (const t of w.tanks) {
+    if (!t.alive || t.id === skipTank) continue;
+    for (const part of ['hull', 'turret'] as const) {
+      const g = part === 'hull' ? t.hull : t.turret;
+      const to = part === 'hull' ? worldToHull : worldToTurret;
+      const lo = to(t, from);
+      const ld = sub3(to(t, [from[0] + dir[0], from[1] + dir[1], from[2] + dir[2]]), lo);
+      const hits = raycastGrid(g, lo, ld, bestT);
+      if (hits.length && hits[0].t < bestT) {
+        bestT = hits[0].t;
+        hit = 'grid';
+      }
+    }
+  }
+  return { pos: [from[0] + dir[0] * bestT, from[1] + dir[1] * bestT, from[2] + dir[2] * bestT], hit };
+}
+
+const sub3 = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 
 function refresh(w: World, observer: Tank, t: Tank, source: ContactSource): void {
   let m = w.awareness.get(observer.id);

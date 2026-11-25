@@ -31,6 +31,11 @@ The horizon sits far outside the play bounds and is rendered as cheap line strip
 
 ### 3.1 Volcano — the centerpiece (state machine)
 
+**Timing (user direction 2026-11-25): matches last 10 minutes; the volcano is
+dormant for the whole match except the FINAL TWO MINUTES**, then cycles
+rumble → erupt → cooldown until the clock runs out. The climax rearranges the
+arena while players fight for the finish.
+
 A seeded cycle, identical on every client because it lives in the sim:
 
 ```

@@ -38,7 +38,9 @@ The original radar showed every enemy at all times. Ours turns information into 
 ## 4. The scope (presentation, faithful to the cabinet)
 
 - **Circular scope, heading-up**: player at center, radar rotates with hull heading; a small center arrow shows the hull, a thin tick shows turret aim.
-- Drawn in the **red HUD band** across the top (the original's colored overlay), score and lives alongside. Canvas 2D — light, crisp, no extra three.js scene needed.
+- Drawn in the **red HUD band** across the top (the original's colored overlay), score and lives alongside, match clock left of the scope.
+- **Alert banner center-top, BELOW the band** (user direction 2026-11-25): `SUPERTANK INBOUND`, `BOMBER RUN`, `VOLCANO RUMBLING — ERUPTION IMMINENT`, `ERUPTION`, `MATCH COMPLETE` — palette-colored, ~4 s fade, max 3 stacked.
+- **Line-of-fire sight** (user direction 2026-11-25): a dim trajectory line from the muzzle to the predicted first impact (grid / obstacle / ground), with an impact cross — makes long-range and elevated shots readable before firing. Canvas 2D — light, crisp, no extra three.js scene needed.
 - **Faint inner ring marks the 30 m sense radius**, so the player always understands what the radar can and can't see.
 - **Radar range ~200 m**; contacts beyond it clamp to the rim (direction preserved, distance lost).
 - **Blip taxonomy**: enemy tanks = red dots; hunter supertank = larger dot; bomber = wedge (only while its blip lives); co-op allies = green.

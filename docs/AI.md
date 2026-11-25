@@ -77,9 +77,9 @@ Everything above lives in the shared sim, seeded → identical on host and clien
 
 ### 5.4 The bomber — the flying piñata (all modes)
 
-Less saucer, more bomber — the default in **every** mode. Every **2 minutes**, one spawns at a map edge and flies a **straight line** across the map at fixed altitude, warbling.
+Less saucer, more bomber — the default in **every** mode. Every **2 minutes**, one spawns at a map edge and flies a **straight line** across the map at fixed altitude (15 m), warbling. It is a **basic aeroplane** in wireframe — fuselage, straight wings, tailplane, fin — not a saucer (user direction 2026-11-25).
 
-- **Bombs anything beneath its path** — player or AI. Each drop is telegraphed by the universal ground ring (≥1.5 s). Dangerous if you're on its line, harmless otherwise.
+- **Bombs deny its flight path** on a cadence (~0.75 s between drops), plus opportunistic drops on any tank — player or AI — beneath it. Each drop is telegraphed by the universal ground ring (≥1.5 s). Dangerous if you're on its line, harmless otherwise.
 - **The information trap**: it's worth bonus points, but **shooting it pings your position** — a ~3 s radar blip visible to every player, and a memory refresh for every AI (in solo, the ping feeds the AI). The points piñata that tells everyone where you are.
 - A few hits kill it (first hit claims the bonus); otherwise it despawns on exit. **Radar-invisible until it fires** — each bomb drop blips its position under the universal gunfire rule, so you can hunt it by its own bombs.
 

@@ -37,6 +37,8 @@ import {
 import { stepAwareness, type Known } from './awareness';
 import { thinkBrain, AI_KNOBS, type AiBrain } from './ai';
 import { BOMBER_PERIOD, SCORE_VALUES, stepDirector, type Bomber, type Missile, type Telegraph } from './director';
+import { createVolcano, stepVolcano, type LavaPool, type Volcano } from './volcano';
+import { MATCH_TICKS } from './combat';
 
 export interface RubbleCell {
   x: number;
@@ -76,6 +78,8 @@ export interface World {
   missiles: Missile[];
   bomber: Bomber | null;
   telegraphs: Telegraph[];
+  volcano: Volcano;
+  lavaPools: LavaPool[];
   stormUntil: number;
   score: number;
   lives: number;
@@ -112,6 +116,8 @@ export function createWorld(seed: number): World {
     missiles: [],
     bomber: null,
     telegraphs: [],
+    volcano: createVolcano(),
+    lavaPools: [],
     stormUntil: 0,
     score: 0,
     lives: 3,
@@ -395,7 +401,27 @@ export function stepWorld(w: World, commands: TankCommand[] = []): void {
 
   stepShells(w, damaged);
   stepDirector(w);
+  stepVolcano(w);
   stepExplosions(w, damaged);
+  // lava pools burn tanks standing in them (1 hp / 0.5 s)
+  if (w.tick % 30 === 0) {
+    for (const pool of w.lavaPools) {
+      if (w.tick >= pool.untilTick) continue;
+      for (const t of w.tanks) {
+        if (!t.alive || Math.hypot(t.x - pool.x, t.z - pool.z) > pool.radius) continue;
+        const occupied: V3[] = [];
+        for (let z = 0; z < t.hull.size.z; z++)
+          for (let y = 0; y < t.hull.size.y; y++)
+            for (let x = 0; x < t.hull.size.x; x++)
+              if (getCell(t.hull, x, y, z)) occupied.push([x, y, z]);
+        if (occupied.length) {
+          const c = occupied[Math.floor(w.rng.next() * occupied.length)];
+          damageCell(w, { g: t.hull, tank: t, part: 'hull' }, c, 1, damaged, null);
+        }
+      }
+    }
+    w.lavaPools = w.lavaPools.filter((p) => w.tick < p.untilTick);
+  }
   stepIntegrity(w, damaged);
   stepChunks(w);
   stepAwareness(w);
@@ -414,6 +440,10 @@ export function stepWorld(w: World, commands: TankCommand[] = []): void {
   while (w.rubble.length > RUBBLE_CAP) {
     w.rubble.shift();
     w.rubbleRev++;
+  }
+  if (w.phase === 'play' && w.tick >= MATCH_TICKS) {
+    w.phase = 'over';
+    w.events.push({ kind: 'matchEnd' });
   }
 }
 
@@ -443,6 +473,8 @@ export function hashWorld(w: World): string {
     `mis${w.missiles.length}`,
     `bmb${w.bomber ? 1 : 0}`,
     `tel${w.telegraphs.length}`,
+    `vol${w.volcano.state}`,
+    `lava${w.lavaPools.length}`,
   );
   const s = parts.join(';');
   let h = 0x811c9dc5;

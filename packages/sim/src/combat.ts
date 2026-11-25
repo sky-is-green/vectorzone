@@ -14,6 +14,9 @@ export const EXPLOSION_RADIUS = 2.5; // m
 export const EXPLOSION_DAMAGE = 3;
 export const RUBBLE_CAP = 400;
 export const CHUNK_SETTLE_TICKS = 72; // 1.2 s of tumble before settling
+export const MATCH_TICKS = 36000; // 10 minutes
+export const VOLCANO_FINAL_TICKS = 7200; // erupts only in the final 2 minutes
+export const BOMB_DROP_TICKS = 45; // bomber denies its flight path
 
 export const PEN_COST: Record<BlockType, number> = {
   hull: 2,
@@ -43,5 +46,9 @@ export type SimEvent =
   | { kind: 'kill'; id: number; what: 'missile' | 'bomber'; by: number | null }
   | { kind: 'scanPing' }
   | { kind: 'bomberInbound'; pos: V3 }
+  | { kind: 'superSpawn'; pos: V3 }
+  | { kind: 'volcanoRumble' }
+  | { kind: 'volcanoErupt' }
+  | { kind: 'matchEnd' }
   | { kind: 'bombTelegraph'; pos: V3 }
   | { kind: 'rubbleChanged' };
