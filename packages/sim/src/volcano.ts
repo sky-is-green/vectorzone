@@ -33,6 +33,7 @@ export function createVolcano(): Volcano {
 
 export function stepVolcano(w: World): void {
   const v = w.volcano;
+  if (!w.sky.volcano) return;
   if (w.tick < MATCH_TICKS - VOLCANO_FINAL_TICKS) return;
   if (v.state === 'dormant') {
     v.state = 'rumble';

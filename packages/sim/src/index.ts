@@ -109,3 +109,5 @@ export { traceShot } from './awareness';
 export { MATCH_TICKS, VOLCANO_FINAL_TICKS, BOMB_DROP_TICKS } from './combat';
 export { createVolcano, stepVolcano, type Volcano, type LavaPool } from './volcano';
 export { CLASSIC_FENCES, fenceAlive, fenceHitT, fencePush, type Fence } from './fence';
+export { MAPS, MAP_IDS, type MapId, type MapDef, type SkyProfile } from './maps';
+export { STORM_TICKS, METEOR_PERIOD, stepSky } from './sky';

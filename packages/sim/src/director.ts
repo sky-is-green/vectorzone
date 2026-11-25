@@ -35,7 +35,7 @@ export interface Telegraph {
   z: number;
   impactTick: number;
   radius: number;
-  kind: 'bomb' | 'volcano';
+  kind: 'bomb' | 'volcano' | 'meteor';
 }
 
 export const SCORE_VALUES = { slow: 100, missile: 250, super: 500, bomber: 1000, block: 5 };
@@ -198,6 +198,6 @@ function stepTelegraphs(w: World): void {
   w.telegraphs = w.telegraphs.filter((t) => w.tick < t.impactTick);
   for (const t of due) {
     w.pendingExplosions.push([t.x, 0.5, t.z]);
-    if (t.kind === 'volcano') bombAftermath(w, t.x, t.z);
+    if (t.kind === 'volcano' || t.kind === 'meteor') bombAftermath(w, t.x, t.z);
   }
 }

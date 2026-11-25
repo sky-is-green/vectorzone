@@ -12,7 +12,7 @@ import {
   type Tank,
   type TankCommand,
 } from './tank';
-import { CLASSIC_STRUCTURES, anchorCells, detachDisconnected, makeStructure, type Structure } from './structure';
+import { anchorCells, detachDisconnected, makeStructure, type Structure } from './structure';
 import { raycastGrid, type V3 } from './raycast';
 import {
   CHUNK_SETTLE_TICKS,
@@ -31,7 +31,9 @@ import { stepAwareness, type Known } from './awareness';
 import { thinkBrain, AI_KNOBS, type AiBrain } from './ai';
 import { BOMBER_PERIOD, SCORE_VALUES, stepDirector, type Bomber, type Missile, type Telegraph } from './director';
 import { createVolcano, stepVolcano, type LavaPool, type Volcano } from './volcano';
-import { CLASSIC_FENCES, fenceAlive, fenceHitT, fencePush, type Fence } from './fence';
+import { fenceAlive, fenceHitT, fencePush, type Fence } from './fence';
+import { MAPS, type MapId, type SkyProfile } from './maps';
+import { stepSky } from './sky';
 import { MATCH_TICKS } from './combat';
 
 export interface RubbleCell {
@@ -72,6 +74,9 @@ export interface World {
   bomber: Bomber | null;
   telegraphs: Telegraph[];
   fences: Fence[];
+  sky: SkyProfile;
+  nextStormTick: number;
+  nextMeteorTick: number;
   volcano: Volcano;
   lavaPools: LavaPool[];
   stormUntil: number;
@@ -88,7 +93,8 @@ export interface World {
 export const TICK_RATE = 60;
 export const TICK_DT = 1 / TICK_RATE;
 
-export function createWorld(seed: number): World {
+export function createWorld(seed: number, map: MapId = 'classic'): World {
+  const def = MAPS[map];
   return {
     seed,
     tick: 0,
@@ -96,7 +102,7 @@ export function createWorld(seed: number): World {
     arenaHalf: 200,
     tanks: [createTank(0, 0, 0, 0)],
     // fresh grids per world: module-level layouts must never be shared/mutated
-    structures: CLASSIC_STRUCTURES.map((s) => makeStructure(s.id, s.kind, s.x, s.z)),
+    structures: def.placements.map((p, i) => makeStructure(100 + i, p.kind, p.x, p.z)),
     shells: [],
     chunks: [],
     rubble: [],
@@ -109,7 +115,10 @@ export function createWorld(seed: number): World {
     missiles: [],
     bomber: null,
     telegraphs: [],
-    fences: CLASSIC_FENCES.map((f) => ({ ...f })),
+    fences: def.fences.map((f) => ({ ...f })),
+    sky: def.sky,
+    nextStormTick: 15000,
+    nextMeteorTick: 6000,
     volcano: createVolcano(),
     lavaPools: [],
     stormUntil: 0,
@@ -410,6 +419,7 @@ export function stepWorld(w: World, commands: TankCommand[] = []): void {
   stepShells(w, damaged);
   stepDirector(w);
   stepVolcano(w);
+  stepSky(w);
   // scan towers ping everyone onto every radar while they stand
   if (w.tick % 600 === 0) {
     for (const s of w.structures) {

@@ -49,6 +49,8 @@ export type SimEvent =
   | { kind: 'superSpawn'; pos: V3 }
   | { kind: 'volcanoRumble' }
   | { kind: 'volcanoErupt' }
+  | { kind: 'ionStorm' }
+  | { kind: 'meteorInbound'; pos: V3 }
   | { kind: 'matchEnd' }
   | { kind: 'bombTelegraph'; pos: V3 }
   | { kind: 'rubbleChanged' };

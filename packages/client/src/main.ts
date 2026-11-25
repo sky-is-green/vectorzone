@@ -27,7 +27,7 @@ import { PALETTES } from './palette';
 import { ParticlePool } from './particles';
 import { createPost } from './post';
 import { buildChunkGeometry, buildRubbleGeometry, buildScenery } from './scenery';
-import { buildPanel, loadSettings, type Settings } from './settings';
+import { buildPanel, loadSettings, saveSettings, type Settings } from './settings';
 import './style.css';
 
 const PHOSPHOR = 0x39ff6b;
@@ -57,7 +57,8 @@ const faceMat = new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.Doubl
 const edgeMat = new THREE.LineBasicMaterial({ color: PHOSPHOR });
 
 // --- sim + tank visuals ----------------------------------------------------
-const world = createWorld(0xb477e2);
+const settings = loadSettings();
+const world = createWorld(0xb477e2, settings.map);
 let tank = world.tanks[0];
 
 interface Body {
@@ -117,6 +118,18 @@ let rubbleRev = -1;
 const chunkGroups = new Map<number, THREE.LineSegments>();
 const fenceGroups = new Map<number, THREE.LineSegments>();
 const fenceMat = new THREE.LineBasicMaterial({ color: 0x39ff6b, transparent: true, opacity: 0.6 });
+
+// M8: screen shake + ion-storm aurora
+let shakeAmp = 0;
+const auroraPos = new Float32Array(3 * 24 * 6);
+const auroraGeo = new THREE.BufferGeometry();
+auroraGeo.setAttribute('position', new THREE.BufferAttribute(auroraPos, 3).setUsage(THREE.DynamicDrawUsage));
+const auroraMat = new THREE.LineBasicMaterial({ color: 0x35e0ff, transparent: true, opacity: 0.5, fog: false });
+const aurora = new THREE.LineSegments(auroraGeo, auroraMat);
+aurora.frustumCulled = false;
+aurora.visible = false;
+scene.add(aurora);
+let meteorAcc = 0;
 
 // --- M5: enemy tanks, missiles, bomber, telegraphs, AI debug overlay --------
 const enemyBodies = new Map<number, { hull: Body; turret: Body }>();
@@ -229,7 +242,6 @@ bindInput();
 
 // --- M2: arena scenery, solids, pooled smoke --------------------------------
 const scen = buildScenery(scene);
-const settings = loadSettings();
 let grid = scen.makeGrid(PALETTES[0].gridCenter, PALETTES[0].grid);
 scene.add(grid);
 const smoke = new ParticlePool(1024, false);
@@ -247,7 +259,17 @@ const tint = {
 };
 
 function applySettings(s: Settings): void {
+  if (s.map !== settings.map) {
+    saveSettings(s);
+    location.reload();
+    return;
+  }
   const P = PALETTES[s.palette % PALETTES.length];
+  camera.fov = s.fov;
+  camera.updateProjectionMatrix();
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2) * s.res);
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  post.resize(window.innerWidth, window.innerHeight);
   edgeMat.color.setHex(P.world);
   rubbleEdgeMat.color.setHex(P.rubble);
   trajMat.color.setHex(P.dim);
@@ -573,6 +595,38 @@ function frame(now: number): void {
   }
   fenceMat.opacity = 0.45 + 0.25 * Math.sin(now / 180);
 
+  // M8 sky: aurora bands during ion storms; meteor streaks on stormfield
+  const storming = world.stormUntil > world.tick;
+  aurora.visible = storming;
+  if (storming) {
+    let n = 0;
+    for (let band = 0; band < 3; band++) {
+      for (let i = 0; i < 24; i++) {
+        const a0 = (i / 24) * Math.PI * 2;
+        const a1 = ((i + 1) / 24) * Math.PI * 2;
+        const y0 = 130 + band * 18 + Math.sin(a0 * 3 + now / 400 + band) * 10;
+        const y1 = 130 + band * 18 + Math.sin(a1 * 3 + now / 400 + band) * 10;
+        auroraPos[n++] = Math.sin(a0) * 520; auroraPos[n++] = y0; auroraPos[n++] = Math.cos(a0) * 520;
+        auroraPos[n++] = Math.sin(a1) * 520; auroraPos[n++] = y1; auroraPos[n++] = Math.cos(a1) * 520;
+      }
+    }
+    (auroraGeo.attributes.position as THREE.BufferAttribute).needsUpdate = true;
+    auroraMat.opacity = 0.3 + 0.25 * Math.sin(now / 300);
+  }
+  if (world.sky.meteors) {
+    meteorAcc += dt;
+    while (meteorAcc > 0.35) {
+      meteorAcc -= 0.35;
+      const a = Math.random() * Math.PI * 2;
+      smoke.spawn(
+        Math.sin(a) * 400, 150 + Math.random() * 60, Math.cos(a) * 400,
+        -Math.sin(a) * 60 - 20, -35, -Math.cos(a) * 60,
+        1.2, tint.tracer[0], tint.tracer[1], tint.tracer[2], 6,
+      );
+    }
+  }
+  shakeAmp *= Math.exp(-dt * 6);
+
   // lava pools pulse hazard-orange while they burn
   for (const pool of world.lavaPools) {
     const pulse = 0.5 + 0.5 * Math.sin(now / 120);
@@ -623,7 +677,12 @@ function frame(now: number): void {
     else if (ev.kind === 'matchEnd') hud.alert('MATCH COMPLETE');
     else if (ev.kind === 'kill' && ev.what === 'bomber') hud.alert('BOMBER DOWN');
     else if (ev.kind === 'scanPing') hud.alert('SCAN PING');
+    else if (ev.kind === 'ionStorm') hud.alert('ION STORM — RADAR DOWN');
+    else if (ev.kind === 'meteorInbound') hud.alert('METEOR INBOUND');
     else if (ev.kind === 'bombTelegraph') lastBombBlip = now;
+    if (ev.kind === 'fire') shakeAmp = Math.min(0.5, shakeAmp + 0.04);
+    if (ev.kind === 'explosion') shakeAmp = Math.min(0.8, shakeAmp + 0.2);
+    if (ev.kind === 'tankKilled') shakeAmp = Math.min(1, shakeAmp + 0.4);
     // killfeed + directional hit flash
     if (ev.kind === 'tankKilled') {
       if (ev.id === 0) {
@@ -719,6 +778,11 @@ function frame(now: number): void {
     camera.quaternion
       .setFromRotationMatrix(turret.group.matrixWorld)
       .multiply(Q_HALF_TURN);
+  }
+  if (settings.shake && shakeAmp > 0.001) {
+    camera.position.x += (Math.random() - 0.5) * shakeAmp;
+    camera.position.y += (Math.random() - 0.5) * shakeAmp;
+    camera.position.z += (Math.random() - 0.5) * shakeAmp;
   }
 
   renderer.info.reset();

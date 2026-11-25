@@ -8,6 +8,9 @@
 
 **Read order (before writing any code):**
 
+**Sequence override (user, 2026-11-25): M8 polish/ship BEFORE M6 sound and
+M7 multiplayer; sound and multiplayer are the last two milestones.**
+
 1. `README.md` — positioning
 2. `PLAN.md` — master blueprint, especially §4 (rendering), §5 (blocks/damage/AI/radar summaries), §7 (sim architecture), §8 (multiplayer), §14 (locked decisions)
 3. `docs/ENVIRONMENTS.md` — the living arena

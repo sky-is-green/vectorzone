@@ -2,12 +2,20 @@
  * Settings (NEW-ERA A4): persisted to localStorage, applied live.
  * A small vector-styled DOM panel; the full settings page arrives in M8.
  */
+import { MAP_IDS, MAPS, type MapId } from '@vectorzone/sim';
+
 export interface Settings {
   palette: number;
   bloom: number;
   crt: number;
   wireframe: boolean;
   safe: boolean;
+  shake: boolean;
+  fov: number;
+  res: number;
+  map: MapId;
+  volMaster: number;
+  volSfx: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -16,6 +24,12 @@ export const DEFAULT_SETTINGS: Settings = {
   crt: 0.6,
   wireframe: false,
   safe: false,
+  shake: true,
+  fov: 60,
+  res: 1,
+  map: 'classic',
+  volMaster: 0.8,
+  volSfx: 0.8,
 };
 
 const KEY = 'vectorzone-settings';
@@ -111,6 +125,77 @@ export function buildPanel(
     commit();
   };
   row('crt', crt);
+
+  const shake = document.createElement('input');
+  shake.type = 'checkbox';
+  shake.checked = s.shake;
+  shake.onchange = () => {
+    s.shake = shake.checked;
+    commit();
+  };
+  row('shake', shake);
+
+  const fov = document.createElement('input');
+  fov.type = 'range';
+  fov.min = '50';
+  fov.max = '90';
+  fov.step = '5';
+  fov.value = String(s.fov);
+  fov.oninput = () => {
+    s.fov = Number(fov.value);
+    commit();
+  };
+  row('fov', fov);
+
+  const res = document.createElement('input');
+  res.type = 'range';
+  res.min = '0.5';
+  res.max = '1';
+  res.step = '0.25';
+  res.value = String(s.res);
+  res.oninput = () => {
+    s.res = Number(res.value);
+    commit();
+  };
+  row('res', res);
+
+  const map = document.createElement('select');
+  for (const id of MAP_IDS) {
+    const o = document.createElement('option');
+    o.value = id;
+    o.textContent = MAPS[id].label;
+    map.append(o);
+  }
+  map.value = s.map;
+  map.onchange = () => {
+    s.map = map.value as MapId;
+    commit();
+  };
+  row('map', map);
+
+  const vm = document.createElement('input');
+  vm.type = 'range';
+  vm.min = '0';
+  vm.max = '1';
+  vm.step = '0.1';
+  vm.value = String(s.volMaster);
+  vm.oninput = () => {
+    s.volMaster = Number(vm.value);
+    commit();
+  };
+  row('vol', vm);
+
+  const vs = document.createElement('input');
+  vs.type = 'range';
+  vs.min = '0';
+  vs.max = '1';
+  vs.step = '0.1';
+  vs.value = String(s.volSfx);
+  vs.oninput = () => {
+    s.volSfx = Number(vs.value);
+    commit();
+  };
+  row('sfx', vs);
 
   return el;
 }
