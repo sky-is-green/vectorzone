@@ -21,6 +21,11 @@ export {
   stepTank,
   computeStats,
   neutralCommand,
+  hullToWorld,
+  worldToHull,
+  turretToWorld,
+  worldToTurret,
+  turretForward,
   PLAYER_HULL_LAYERS,
   PLAYER_TURRET_LAYERS,
   GUN_PITCH_MIN,
@@ -36,6 +41,8 @@ export {
   TICK_RATE,
   TICK_DT,
   type World,
+  type Chunk,
+  type RubbleCell,
 } from './world';
 export {
   CLASSIC_OBSTACLES,
@@ -44,3 +51,27 @@ export {
   collideObstacles,
   type Obstacle,
 } from './arena';
+export { raycastGrid, type V3, type GridHit } from './raycast';
+export {
+  SHELL_SPEED,
+  SHELL_COOLDOWN,
+  SHELL_BUDGET,
+  SPLASH_DAMAGE,
+  EXPLOSION_RADIUS,
+  EXPLOSION_DAMAGE,
+  RUBBLE_CAP,
+  CHUNK_SETTLE_TICKS,
+  PEN_COST,
+  type Shell,
+  type SimEvent,
+} from './combat';
+export {
+  CLASSIC_STRUCTURES,
+  structureGrid,
+  makeStructure,
+  anchorCells,
+  detachDisconnected,
+  type Structure,
+  type StructureKind,
+  type AnchorKind,
+} from './structure';

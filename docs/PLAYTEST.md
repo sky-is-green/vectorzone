@@ -54,6 +54,7 @@ tuning. A milestone with an un-run play-test is not fully done (BUILD.md §3).
 | ID | Opened | Milestone | Observation | Hypotheses | Status |
 |---|---|---|---|---|---|
 | F1 | 2026-11-25 | M1 | Turret controls "acted strangely" in human use (mechanics probes all passed) | **Root cause found by user:** camera was an analytic approximation of the turret, not attached to the gun — look-direction diverged from the barrel axis under combined yaw+pitch, and the eye didn't swing with elevation. Secondary: default XYZ Euler order coupled turret yaw/pitch wrongly. **Fix:** rigid gun mount (camera = turret world transform ∘ fixed local offset) + turret rotation order `YXZ`. Verified: camera/barrel axis dot = 1 at rest, combined yaw+pitch, and after hull turns; eye swings with pitch. **Human re-confirm 2026-11-25: "much better, turret mechanics are complete."** | **CLOSED** |
+| F2 | 2026-11-25 | M3 | Destruction feel unverified by human; tuning question: muzzle (1.2 m) overflies low cover (0.6–0.9 m) on flat shots — is aiming down at low structures intuitive? | Play-test: hole readability from both sides, debris/collapse satisfaction, chain legibility, low-cover aiming feel | **open — awaiting M3 session** |
 
 ## Rule
 

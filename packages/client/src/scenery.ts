@@ -5,7 +5,7 @@
  */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { obstacleGrid, type Obstacle } from '@vectorzone/sim';
+import { BLOCK_SIZE, obstacleGrid, type Obstacle, type RubbleCell } from '@vectorzone/sim';
 import { buildEntityGeometry } from './geometry';
 
 const DIM = 0x1d7a3a;
@@ -97,4 +97,54 @@ export function buildObstacleMeshes(obstacles: Obstacle[]): THREE.Group {
     new THREE.LineSegments(mergeGeometries(edges), new THREE.LineBasicMaterial({ color: PHOSPHOR })),
   );
   return group;
+}
+
+/** Settled rubble: one merged face+edge pair, rebuilt only when rubble changes. */
+export function buildRubbleGeometry(rubble: RubbleCell[]): {
+  faces: THREE.BufferGeometry;
+  edges: THREE.BufferGeometry;
+} {
+  const fp: number[] = [];
+  const ep: number[] = [];
+  const bs = BLOCK_SIZE;
+  for (const r of rubble) {
+    const x0 = r.x - bs / 2, x1 = r.x + bs / 2;
+    const y0 = 0, y1 = bs;
+    const z0 = r.z - bs / 2, z1 = r.z + bs / 2;
+    const c = [
+      [x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1],
+      [x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1],
+    ];
+    const quads = [
+      [0, 1, 2, 3], [4, 5, 6, 7], [0, 1, 5, 4],
+      [2, 3, 7, 6], [1, 2, 6, 5], [0, 3, 7, 4],
+    ];
+    for (const q of quads) {
+      for (const i of [0, 1, 2, 0, 2, 3]) fp.push(...c[q[i]]);
+      for (let i = 0; i < 4; i++) ep.push(...c[q[i]], ...c[q[(i + 1) % 4]]);
+    }
+  }
+  const faces = new THREE.BufferGeometry();
+  faces.setAttribute('position', new THREE.Float32BufferAttribute(fp, 3));
+  const edges = new THREE.BufferGeometry();
+  edges.setAttribute('position', new THREE.Float32BufferAttribute(ep, 3));
+  return { faces, edges };
+}
+
+/** A tumbling chunk: cube edges per cell, offsets from the chunk centroid. */
+export function buildChunkGeometry(cells: { off: [number, number, number] }[]): THREE.BufferGeometry {
+  const ep: number[] = [];
+  const h = BLOCK_SIZE / 2;
+  for (const { off } of cells) {
+    const [cx, cy, cz] = off;
+    const c = [
+      [cx - h, cy - h, cz - h], [cx + h, cy - h, cz - h], [cx + h, cy - h, cz + h], [cx - h, cy - h, cz + h],
+      [cx - h, cy + h, cz - h], [cx + h, cy + h, cz - h], [cx + h, cy + h, cz + h], [cx - h, cy + h, cz + h],
+    ];
+    const E = [[0, 1], [1, 2], [2, 3], [3, 0], [4, 5], [5, 6], [6, 7], [7, 4], [0, 4], [1, 5], [2, 6], [3, 7]];
+    for (const [a, b] of E) ep.push(...c[a], ...c[b]);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(ep, 3));
+  return g;
 }

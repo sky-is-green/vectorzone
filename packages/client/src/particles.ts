@@ -10,14 +10,14 @@ export class ParticlePool {
   private max: number;
   private pos: Float32Array;
   private col: Float32Array;
-  private p: Float32Array; // x y z vx vy vz life maxLife len r g b  (12 floats)
+  private p: Float32Array; // x y z vx vy vz life maxLife len r g b sx sy sz (15)
   private cursor = 0;
 
   constructor(max = 1024, fog = true) {
     this.max = max;
     this.pos = new Float32Array(max * 6);
     this.col = new Float32Array(max * 6);
-    this.p = new Float32Array(max * 12);
+    this.p = new Float32Array(max * 15);
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(this.pos, 3).setUsage(THREE.DynamicDrawUsage));
     geo.setAttribute('color', new THREE.BufferAttribute(this.col, 3).setUsage(THREE.DynamicDrawUsage));
@@ -36,19 +36,21 @@ export class ParticlePool {
     x: number, y: number, z: number,
     vx: number, vy: number, vz: number,
     life: number, r: number, g: number, b: number, len = 0.5,
+    sx = 0, sy = 0, sz = 0,
   ): void {
-    const i = (this.cursor++ % this.max) * 12;
+    const i = (this.cursor++ % this.max) * 15;
     const p = this.p;
     p[i] = x; p[i + 1] = y; p[i + 2] = z;
     p[i + 3] = vx; p[i + 4] = vy; p[i + 5] = vz;
     p[i + 6] = life; p[i + 7] = life; p[i + 8] = len;
     p[i + 9] = r; p[i + 10] = g; p[i + 11] = b;
+    p[i + 12] = sx; p[i + 13] = sy; p[i + 14] = sz;
   }
 
   update(dt: number): void {
     const p = this.p;
     for (let n = 0; n < this.max; n++) {
-      const i = n * 12;
+      const i = n * 15;
       const o = n * 6;
       if (p[i + 6] <= 0) {
         // dead: collapse to a zero-length black segment far below the arena
@@ -63,12 +65,17 @@ export class ParticlePool {
       p[i] += p[i + 3] * dt;
       p[i + 1] += p[i + 4] * dt;
       p[i + 2] += p[i + 5] * dt;
-      const vlen = Math.hypot(p[i + 3], p[i + 4], p[i + 5]) || 1;
+      // segment orientation: explicit dir (static decals) else velocity trail
+      let dx = p[i + 12], dy = p[i + 13], dz = p[i + 14];
+      if (dx === 0 && dy === 0 && dz === 0) {
+        dx = p[i + 3]; dy = p[i + 4]; dz = p[i + 5];
+      }
+      const vlen = Math.hypot(dx, dy, dz) || 1;
       const l = p[i + 8] / vlen;
       this.pos[o] = p[i]; this.pos[o + 1] = p[i + 1]; this.pos[o + 2] = p[i + 2];
-      this.pos[o + 3] = p[i] - p[i + 3] * l;
-      this.pos[o + 4] = p[i + 1] - p[i + 4] * l;
-      this.pos[o + 5] = p[i + 2] - p[i + 5] * l;
+      this.pos[o + 3] = p[i] - dx * l;
+      this.pos[o + 4] = p[i + 1] - dy * l;
+      this.pos[o + 5] = p[i + 2] - dz * l;
       const f = Math.max(p[i + 6], 0) / p[i + 7];
       this.col[o] = this.col[o + 3] = p[i + 9] * f;
       this.col[o + 1] = this.col[o + 4] = p[i + 10] * f;

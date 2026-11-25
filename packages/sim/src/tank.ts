@@ -12,6 +12,7 @@ import {
   type BlockGrid,
 } from './grid';
 import { collideObstacles, type Obstacle } from './arena';
+import type { V3 } from './raycast';
 
 export interface TankCommand {
   throttle: number; // [-1, 1]
@@ -50,6 +51,8 @@ export interface Tank {
   stats: TankStats;
   /** Turret mount point in hull-local metres. */
   turretPivot: { x: number; y: number; z: number };
+  alive: boolean;
+  cooldown: number; // s until next shot
 }
 
 /**
@@ -123,7 +126,60 @@ export function createTank(id: number, x: number, z: number, heading: number): T
     gunPitch: 0,
     stats: computeStats(hull, turret),
     turretPivot: { x: 0, y: hull.size.y * BLOCK_SIZE, z: 0.3 },
+    alive: true,
+    cooldown: 0,
   };
+}
+
+// --- frame transforms (grid-local metres <-> world) -------------------------
+// hull local: x/z centred, y from 0. heading positive-left, forward +Z.
+
+export function hullToWorld(t: Tank, l: V3): V3 {
+  const c = Math.cos(t.heading);
+  const s = Math.sin(t.heading);
+  return [t.x + l[0] * c + l[2] * s, l[1], t.z - l[0] * s + l[2] * c];
+}
+
+export function worldToHull(t: Tank, p: V3): V3 {
+  const c = Math.cos(t.heading);
+  const s = Math.sin(t.heading);
+  const dx = p[0] - t.x;
+  const dz = p[2] - t.z;
+  return [dx * c - dz * s, p[1], dx * s + dz * c];
+}
+
+/** turret local -> world: Rx(-pitch), Ry(turretYaw), +pivot, Ry(heading), +pos */
+export function turretToWorld(t: Tank, l: V3): V3 {
+  const cp = Math.cos(t.gunPitch);
+  const sp = Math.sin(t.gunPitch);
+  const y1 = l[1] * cp + l[2] * sp;
+  const z1 = -l[1] * sp + l[2] * cp;
+  const cy = Math.cos(t.turretYaw);
+  const sy = Math.sin(t.turretYaw);
+  const x2 = l[0] * cy + z1 * sy;
+  const z2 = -l[0] * sy + z1 * cy;
+  return hullToWorld(t, [x2 + t.turretPivot.x, y1 + t.turretPivot.y, z2 + t.turretPivot.z]);
+}
+
+export function worldToTurret(t: Tank, p: V3): V3 {
+  const h = worldToHull(t, p);
+  const lx = h[0] - t.turretPivot.x;
+  const ly = h[1] - t.turretPivot.y;
+  const lz = h[2] - t.turretPivot.z;
+  const cy = Math.cos(t.turretYaw);
+  const sy = Math.sin(t.turretYaw);
+  const x1 = lx * cy - lz * sy;
+  const z1 = lx * sy + lz * cy;
+  const cp = Math.cos(t.gunPitch);
+  const sp = Math.sin(t.gunPitch);
+  return [x1, ly * cp - z1 * sp, ly * sp + z1 * cp];
+}
+
+/** World-space gun axis (matches the rigid camera mount). */
+export function turretForward(t: Tank): V3 {
+  const yaw = t.heading + t.turretYaw;
+  const cp = Math.cos(t.gunPitch);
+  return [cp * Math.sin(yaw), Math.sin(t.gunPitch), cp * Math.cos(yaw)];
 }
 
 /** One fixed tick of tank kinematics. Pure data in, pure data out. */

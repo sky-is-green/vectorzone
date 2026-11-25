@@ -32,7 +32,7 @@
 - [x] M0 — Hello, vector
 - [x] M1 — Block tank
 - [x] M2 — The arena
-- [ ] M3 — Fire & destroy
+- [x] M3 — Fire & destroy
 - [ ] M4 — Phosphor
 - [ ] M5 — The enemy
 - [ ] M6 — Sound
