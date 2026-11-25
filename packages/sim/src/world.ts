@@ -34,7 +34,7 @@ import {
   type Shell,
   type SimEvent,
 } from './combat';
-import { stepAwareness, type Known } from './awareness';
+import { stepAwareness, obstacleHitT, type Known } from './awareness';
 import { thinkBrain, AI_KNOBS, type AiBrain } from './ai';
 import { BOMBER_PERIOD, SCORE_VALUES, stepDirector, type Bomber, type Missile, type Telegraph } from './director';
 import { createVolcano, stepVolcano, type LavaPool, type Volcano } from './volcano';
@@ -203,6 +203,18 @@ function stepShells(w: World, damaged: Damaged): void {
   const ctxs = gridCtxs(w);
   for (const sh of w.shells) {
     if (!sh.alive) continue;
+    // indestructible solids block shots (faithful shot-blockers)
+    let tOb = Infinity;
+    for (const ob of w.obstacles) {
+      const t = obstacleHitT(sh.pos, sh.dir, step, ob);
+      if (t !== null && t < tOb) tOb = t;
+    }
+    if (tOb !== Infinity) {
+      sh.pos = add(sh.pos, mul(sh.dir, tOb));
+      sh.alive = false;
+      w.events.push({ kind: 'shellImpact', pos: [...sh.pos] });
+      continue;
+    }
     const cands: { t: number; ctx: GridCtx; cell: V3 }[] = [];
     for (const ctx of ctxs) {
       if (ctx.tank && ctx.tank.id === sh.owner) continue;
@@ -369,6 +381,7 @@ function stepChunks(w: World): void {
 
 export function stepWorld(w: World, commands: TankCommand[] = []): void {
   w.events = [];
+  if (w.phase === 'over') return; // match finished: world freezes for the results screen
   w.tick += 1;
   const damaged: Damaged = new Map();
 
@@ -403,6 +416,38 @@ export function stepWorld(w: World, commands: TankCommand[] = []): void {
   stepDirector(w);
   stepVolcano(w);
   stepExplosions(w, damaged);
+  // ramming: destructible structures fall apart instead of stopping the tank
+  // (indestructible solids still hard-stop, faithful to 1980)
+  for (const t of w.tanks) {
+    if (!t.alive || Math.abs(t.speed) < 0.5) continue;
+    const r = (t.hull.size.z * BLOCK_SIZE) / 2;
+    for (const s of w.structures) {
+      const hx = (s.grid.size.x * BLOCK_SIZE) / 2 + r;
+      const hz = (s.grid.size.z * BLOCK_SIZE) / 2 + r;
+      if (Math.abs(t.x - s.x) > hx || Math.abs(t.z - s.z) > hz) continue;
+      const lx = t.x - s.x;
+      const lz = t.z - s.z;
+      const x0 = Math.max(0, Math.floor((lx - r) / BLOCK_SIZE + s.grid.size.x / 2));
+      const x1 = Math.min(s.grid.size.x - 1, Math.ceil((lx + r) / BLOCK_SIZE + s.grid.size.x / 2));
+      const z0 = Math.max(0, Math.floor((lz - r) / BLOCK_SIZE + s.grid.size.z / 2));
+      const z1 = Math.min(s.grid.size.z - 1, Math.ceil((lz + r) / BLOCK_SIZE + s.grid.size.z / 2));
+      let smashed = false;
+      for (let z = z0; z <= z1; z++) {
+        for (let x = x0; x <= x1; x++) {
+          for (let y = 0; y < s.grid.size.y; y++) {
+            if (!getCell(s.grid, x, y, z)) continue;
+            const wx = s.x + (x - s.grid.size.x / 2 + 0.5) * BLOCK_SIZE;
+            const wz = s.z + (z - s.grid.size.z / 2 + 0.5) * BLOCK_SIZE;
+            if (Math.hypot(wx - t.x, wz - t.z) < r + 0.2) {
+              damageCell(w, { g: s.grid, structure: s }, [x, y, z], 3, damaged, t.id);
+              smashed = true;
+            }
+          }
+        }
+      }
+      if (smashed) t.speed *= 0.85; // plowing through costs momentum, not a stop
+    }
+  }
   // lava pools burn tanks standing in them (1 hp / 0.5 s)
   if (w.tick % 30 === 0) {
     for (const pool of w.lavaPools) {

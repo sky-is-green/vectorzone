@@ -97,3 +97,53 @@ canvas {
   75% { opacity: 1; }
   100% { opacity: 0; }
 }
+
+#gameover {
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: rgba(0, 0, 0, 0.82);
+  font: 14px/1.5 monospace;
+  text-align: center;
+}
+
+#gameover h1 {
+  font-size: 28px;
+  letter-spacing: 6px;
+  margin: 0;
+  text-shadow: 0 0 12px currentColor;
+}
+
+#gameover .final {
+  font-size: 18px;
+  letter-spacing: 3px;
+  margin: 0;
+}
+
+#gameover table {
+  border-collapse: collapse;
+  margin: 0 auto;
+}
+
+#gameover td,
+#gameover th {
+  padding: 2px 14px;
+  border-bottom: 1px solid currentColor;
+  text-align: left;
+}
+
+#gameover tr.me td {
+  text-shadow: 0 0 8px currentColor;
+  font-weight: bold;
+}
+
+#gameover .hint {
+  opacity: 0.7;
+  letter-spacing: 2px;
+  animation: alert-fade 2s infinite;
+}

@@ -148,6 +148,43 @@ scene.add(trajLines);
 
 const hud = createHud();
 let lastBombBlip = -1e9;
+let matchReported = false;
+
+// local leaderboard + results screen (5g)
+const SCORES_KEY = 'vectorzone-scores';
+interface ScoreRow { score: number; date: string }
+function loadScores(): ScoreRow[] {
+  try {
+    return JSON.parse(localStorage.getItem(SCORES_KEY) ?? '[]') as ScoreRow[];
+  } catch {
+    return [];
+  }
+}
+function showGameOver(): void {
+  const rows = loadScores();
+  rows.push({ score: world.score, date: new Date().toISOString().slice(0, 10) });
+  rows.sort((a, b) => b.score - a.score);
+  const top = rows.slice(0, 5);
+  try {
+    localStorage.setItem(SCORES_KEY, JSON.stringify(top));
+  } catch { /* private mode */ }
+  const P = PALETTES[settings.palette % PALETTES.length];
+  const el = document.createElement('div');
+  el.id = 'gameover';
+  el.style.color = P.hud;
+  const title = world.lives <= 0 ? 'GAME OVER' : 'MATCH COMPLETE';
+  el.innerHTML =
+    `<h1>${title}</h1>` +
+    `<p class="final">SCORE ${String(world.score).padStart(6, '0')}</p>` +
+    `<table><tr><th>#</th><th>SCORE</th><th>DATE</th></tr>` +
+    top.map((r, i) => `<tr${r.score === world.score && r.date === new Date().toISOString().slice(0, 10) ? ' class="me"' : ''}><td>${i + 1}</td><td>${String(r.score).padStart(6, '0')}</td><td>${r.date}</td></tr>`).join('') +
+    `</table>` +
+    `<p class="hint">PRESS R TO RESTART</p>`;
+  document.body.append(el);
+}
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'KeyR' && world.phase === 'over') location.reload();
+});
 
 function crossGeometry(size: number): THREE.BufferGeometry {
   const s = size;
@@ -349,12 +386,20 @@ function frame(now: number): void {
   accumulator += dt;
   const cmd = readCommand();
   const evQueue: SimEvent[] = [];
-  while (accumulator >= TICK_DT) {
-    stepWorld(world, [cmd]);
-    evQueue.push(...world.events);
-    accumulator -= TICK_DT;
+  if (world.phase !== 'over') {
+    while (accumulator >= TICK_DT) {
+      stepWorld(world, [cmd]);
+      evQueue.push(...world.events);
+      accumulator -= TICK_DT;
+    }
+  } else {
+    accumulator = 0;
   }
   tank = world.tanks[0];
+  if (world.phase === 'over' && !matchReported) {
+    matchReported = true;
+    showGameOver();
+  }
 
   refreshBody(hull, tank.hull);
   refreshBody(turret, tank.turret);
@@ -606,6 +651,10 @@ function frame(now: number): void {
   if (debug.cam) {
     camera.position.set(...debug.cam.p);
     camera.lookAt(...debug.cam.l);
+  } else if (!tank.alive && world.respawnTick > 0) {
+    // deathcam: hold on the wreck for the 3 s respawn delay
+    camera.position.set(tank.x + 6, 4, tank.z + 6);
+    camera.lookAt(tank.x, 1, tank.z);
   } else if (chase) {
     camera.position.set(
       tank.x - Math.sin(tank.heading) * 12,
