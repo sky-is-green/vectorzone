@@ -4,9 +4,10 @@
  * as tumbling chunks. Anchors: hull = core, turret = gun, structure = base.
  */
 import { getCell, parseLayout, setCell, type BlockGrid } from './grid';
+import { SOLID_PLACEMENTS, solidGrid, type SolidKind } from './arena';
 import type { V3 } from './raycast';
 
-export type StructureKind = 'wall' | 'bunker' | 'tower' | 'depot' | 'rocks';
+export type StructureKind = 'wall' | 'bunker' | 'tower' | 'depot' | 'rocks' | SolidKind;
 
 export interface Structure {
   id: number;
@@ -56,6 +57,8 @@ export function structureGrid(kind: StructureKind): BlockGrid {
     case 'tower': return parseLayout(TOWER);
     case 'depot': return parseLayout(DEPOT);
     case 'rocks': return parseLayout(ROCKS);
+    case 'cube': return solidGrid('cube');
+    case 'pyramid': return solidGrid('pyramid');
   }
 }
 
@@ -70,6 +73,8 @@ export const CLASSIC_STRUCTURES: Structure[] = [
   makeStructure(102, 'bunker', -55, 40),
   makeStructure(103, 'tower', 70, -70),
   makeStructure(104, 'depot', 15, -55),
+  // the faithful cubes & pyramids — destructible like everything else
+  ...SOLID_PLACEMENTS.map((p, i) => makeStructure(200 + i, p.kind, p.x, p.z)),
 ];
 
 export type AnchorKind = 'hull' | 'turret' | 'structure';

@@ -12,14 +12,7 @@ import {
   type Tank,
   type TankCommand,
 } from './tank';
-import { CLASSIC_OBSTACLES, type Obstacle } from './arena';
-import {
-  CLASSIC_STRUCTURES,
-  anchorCells,
-  detachDisconnected,
-  makeStructure,
-  type Structure,
-} from './structure';
+import { CLASSIC_STRUCTURES, anchorCells, detachDisconnected, makeStructure, type Structure } from './structure';
 import { raycastGrid, type V3 } from './raycast';
 import {
   CHUNK_SETTLE_TICKS,
@@ -34,7 +27,7 @@ import {
   type Shell,
   type SimEvent,
 } from './combat';
-import { stepAwareness, obstacleHitT, type Known } from './awareness';
+import { stepAwareness, type Known } from './awareness';
 import { thinkBrain, AI_KNOBS, type AiBrain } from './ai';
 import { BOMBER_PERIOD, SCORE_VALUES, stepDirector, type Bomber, type Missile, type Telegraph } from './director';
 import { createVolcano, stepVolcano, type LavaPool, type Volcano } from './volcano';
@@ -62,7 +55,6 @@ export interface World {
   tick: number;
   rng: Rng;
   arenaHalf: number;
-  obstacles: Obstacle[];
   tanks: Tank[];
   structures: Structure[];
   shells: Shell[];
@@ -100,7 +92,6 @@ export function createWorld(seed: number): World {
     tick: 0,
     rng: createRng(seed),
     arenaHalf: 200,
-    obstacles: CLASSIC_OBSTACLES,
     tanks: [createTank(0, 0, 0, 0)],
     // fresh grids per world: module-level layouts must never be shared/mutated
     structures: CLASSIC_STRUCTURES.map((s) => makeStructure(s.id, s.kind, s.x, s.z)),
@@ -203,18 +194,6 @@ function stepShells(w: World, damaged: Damaged): void {
   const ctxs = gridCtxs(w);
   for (const sh of w.shells) {
     if (!sh.alive) continue;
-    // indestructible solids block shots (faithful shot-blockers)
-    let tOb = Infinity;
-    for (const ob of w.obstacles) {
-      const t = obstacleHitT(sh.pos, sh.dir, step, ob);
-      if (t !== null && t < tOb) tOb = t;
-    }
-    if (tOb !== Infinity) {
-      sh.pos = add(sh.pos, mul(sh.dir, tOb));
-      sh.alive = false;
-      w.events.push({ kind: 'shellImpact', pos: [...sh.pos] });
-      continue;
-    }
     const cands: { t: number; ctx: GridCtx; cell: V3 }[] = [];
     for (const ctx of ctxs) {
       if (ctx.tank && ctx.tank.id === sh.owner) continue;
@@ -399,7 +378,7 @@ export function stepWorld(w: World, commands: TankCommand[] = []): void {
     if (!t.alive) continue;
     const brain = w.brains.get(t.id);
     const cmd = i === 0 ? (commands[0] ?? neutralCommand()) : brain ? thinkBrain(w, brain, t) : neutralCommand();
-    stepTank(t, cmd, TICK_DT, w.arenaHalf, w.obstacles);
+    stepTank(t, cmd, TICK_DT, w.arenaHalf);
     t.cooldown = Math.max(0, t.cooldown - TICK_DT);
     if (cmd.fire && t.cooldown === 0 && anchorCells(t.turret, 'turret').length > 0) {
       const dir = turretForward(t);

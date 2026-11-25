@@ -24,7 +24,7 @@ import { bindInput, readCommand } from './input';
 import { PALETTES } from './palette';
 import { ParticlePool } from './particles';
 import { createPost } from './post';
-import { buildChunkGeometry, buildObstacleMeshes, buildRubbleGeometry, buildScenery } from './scenery';
+import { buildChunkGeometry, buildRubbleGeometry, buildScenery } from './scenery';
 import { buildPanel, loadSettings, type Settings } from './settings';
 import './style.css';
 
@@ -226,7 +226,6 @@ const scen = buildScenery(scene);
 const settings = loadSettings();
 let grid = scen.makeGrid(PALETTES[0].gridCenter, PALETTES[0].grid);
 scene.add(grid);
-scene.add(buildObstacleMeshes(world.obstacles, faceMat, edgeMat));
 const smoke = new ParticlePool(1024, false);
 scene.add(smoke.object);
 let smokeAcc = 0;

@@ -11,7 +11,6 @@ import {
   parseLayout,
   type BlockGrid,
 } from './grid';
-import { collideObstacles, type Obstacle } from './arena';
 import type { V3 } from './raycast';
 
 export interface TankCommand {
@@ -252,7 +251,6 @@ export function stepTank(
   cmd: TankCommand,
   dt: number,
   arenaHalf: number,
-  obstacles: Obstacle[] = [],
 ): void {
   const target = clamp(cmd.throttle, -1, 1) * t.stats.topSpeed;
   const maxDv = t.stats.accel * dt;
@@ -262,11 +260,10 @@ export function stepTank(
   t.x += Math.sin(t.heading) * t.speed * dt;
   t.z += Math.cos(t.heading) * t.speed * dt;
 
-  // arena bounds (M1: clamp; M2 adds obstacle collision)
+  // arena bounds
   const lim = arenaHalf - 1.5;
   t.x = clamp(t.x, -lim, lim);
   t.z = clamp(t.z, -lim, lim);
-  collideObstacles(t, obstacles);
 
   t.turretYaw += clamp(cmd.turretYaw, -1, 1) * t.stats.turretSlew * dt;
   t.gunPitch = clamp(

@@ -6,7 +6,6 @@
  */
 import { raycastGrid, type V3 } from './raycast';
 import { worldToHull, worldToTurret, type Tank } from './tank';
-import type { Obstacle } from './arena';
 import type { World } from './world';
 
 export const PROXIMITY = 30;
@@ -30,37 +29,11 @@ export function targetable(w: World, t: Tank): boolean {
   return t.alive && w.tick - t.spawnTick >= GRACE_TICKS;
 }
 
-/** Segment vs obstacle AABBs (slab test); entry distance or null. */
-export function obstacleHitT(o: V3, d: V3, len: number, ob: Obstacle): number | null {
-  let tmin = 0;
-  let tmax = len;
-  for (let i = 0; i < 3; i += 2) {
-    const half = ob.half;
-    const c = i === 0 ? ob.x : ob.z;
-    const lo = c - half;
-    const hi = c + half;
-    if (Math.abs(d[i]) < 1e-9) {
-      if (o[i] < lo || o[i] > hi) return null;
-    } else {
-      let t1 = (lo - o[i]) / d[i];
-      let t2 = (hi - o[i]) / d[i];
-      if (t1 > t2) [t1, t2] = [t2, t1];
-      tmin = Math.max(tmin, t1);
-      tmax = Math.min(tmax, t2);
-      if (tmin > tmax) return null;
-    }
-  }
-  return tmax >= 0 && tmin <= len ? tmin : null;
-}
-
 export function hasLos(w: World, from: V3, to: V3): boolean {
   const d: V3 = [to[0] - from[0], to[1] - from[1], to[2] - from[2]];
   const len = Math.hypot(d[0], d[1], d[2]);
   if (len < 1e-6) return true;
   const dn: V3 = [d[0] / len, d[1] / len, d[2] / len];
-  for (const ob of w.obstacles) {
-    if (obstacleHitT(from, dn, len, ob) !== null) return false;
-  }
   for (const s of w.structures) {
     if (s.grid.cells.every((c) => !c)) continue;
     const lo: V3 = [from[0] - s.x, from[1], from[2] - s.z];
@@ -79,21 +52,14 @@ export function traceShot(
   dir: V3,
   maxT: number,
   skipTank: number,
-): { pos: V3; hit: 'grid' | 'obstacle' | 'ground' | 'max' } {
+): { pos: V3; hit: 'grid' | 'ground' | 'max' } {
   let bestT = maxT;
-  let hit: 'grid' | 'obstacle' | 'ground' | 'max' = 'max';
+  let hit: 'grid' | 'ground' | 'max' = 'max';
   if (dir[1] < -1e-6) {
     const t = -from[1] / dir[1];
     if (t >= 0 && t < bestT) {
       bestT = t;
       hit = 'ground';
-    }
-  }
-  for (const ob of w.obstacles) {
-    const t = obstacleHitT(from, dir, bestT, ob);
-    if (t !== null && t < bestT) {
-      bestT = t;
-      hit = 'obstacle';
     }
   }
   for (const s of w.structures) {

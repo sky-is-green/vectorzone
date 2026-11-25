@@ -148,7 +148,11 @@ Full design in **[`docs/ENVIRONMENTS.md`](docs/ENVIRONMENTS.md)**. Summary:
 
 - **Three layers**: horizon spectacle (mountains, moon, **erupting volcano state machine**, rare meteors/ion storms), arena matter (fully reactive objects), ambient dust (pooled line particles).
 - **Flat arena** (faithful), bounded, ~400 × 400 m; ground grid fading into fog; scorch-ring decals instead of terrain deformation.
-- **Indestructible solids** (cubes/pyramids, like 1980) + **destructible structures** on the same block grids as tanks: walls erode, buildings tunnel, towers collapse floor-by-floor with crush damage, fuel depots chain-explode.
+- **All environment objects are destructible block assemblies** (user override
+  2026-11-25: the faithful "indestructible solids" class is retired): cubes and
+  pyramids keep their 1980 shapes but ram apart and tunnel like walls,
+  bunkers, towers, and depots. Walls erode, buildings tunnel, towers collapse
+  floor-by-floor with crush damage, fuel depots chain-explode.
 - **Reactive props**: scan towers ping everyone onto radar until destroyed; energy fences block shots/movement until a pylon dies.
 - **Rubble persists** as capped, destructible low cover — the battlefield evolves during the fight.
 - **Every hazard telegraphs** (ground ring + audio ≥1.5 s); orange/red palette reserved for danger; all events seeded in the sim → identical for every client.
@@ -285,6 +289,7 @@ vectorzone/
 7. **Enemy AI**: faithful escalation & personalities, toned down with imperfect info and human-like aiming (`docs/AI.md`). ✔
 8. **Radar**: reveals anything that fires (~3 s blip) + enemies within 30 m; scan pings/storms as designed; AI mirrors the same rules (`docs/RADAR.md`). ✔
 9. **Positioning & tech**: try-once tech demo, no retention features; adopted spatial audio, phosphor palette modes, PixelQR join codes (`docs/NEW-ERA.md`). ✔
+10. **All environment objects destructible** (user override 2026-11-25): cubes/pyramids keep their faithful shapes but ram apart and tunnel; no indestructible class. ✔
 
 ## 15. Immediate next step
 

@@ -45,11 +45,10 @@ export {
   type RubbleCell,
 } from './world';
 export {
-  CLASSIC_OBSTACLES,
-  obstacleGrid,
-  makeObstacle,
-  collideObstacles,
-  type Obstacle,
+  SOLID_PLACEMENTS,
+  solidGrid,
+  type SolidKind,
+  type SolidPlacement,
 } from './arena';
 export { raycastGrid, type V3, type GridHit } from './raycast';
 export {
@@ -106,6 +105,6 @@ export {
   type Telegraph,
 } from './director';
 export { createEnemyTank } from './tank';
-export { traceShot, obstacleHitT } from './awareness';
+export { traceShot } from './awareness';
 export { MATCH_TICKS, VOLCANO_FINAL_TICKS, BOMB_DROP_TICKS } from './combat';
 export { createVolcano, stepVolcano, type Volcano, type LavaPool } from './volcano';

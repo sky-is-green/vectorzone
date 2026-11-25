@@ -68,7 +68,7 @@ DORMANT ──► RUMBLE ──► ERUPT ──► COOLDOWN ──► DORMANT
 
 | Class | Examples | Behavior |
 |---|---|---|
-| **Indestructible solids** (faithful) | cubes, pyramids, monoliths | Hard cover, shot blockers. Exactly like 1980. The reliable constants in a reactive world. |
+| **Classic solids** (faithful shapes, destructible) | cubes, pyramids | Same block grids as everything else (user override 2026-11-25): ram apart, tunnel, collapse. No indestructible class remains. |
 | **Destructible structures** | walls, bunkers, buildings, towers | Tank-style block grids. Chip, tunnel, collapse. |
 | **Explosive sites** | fuel depots, ammo dumps | Clusters of `ammo` blocks → chain reactions. |
 | **Reactive props** | scan towers, radar dishes, beacons | Idle animation + a gameplay effect when destroyed. |
@@ -83,8 +83,8 @@ Same block grid, same types where sensible (`hull`, `ammo`, `core`-like anchor c
 - **Ramming (user direction 2026-11-25)**: destructible structures do NOT stop a
   tank — plowing through smashes the blocks in the tank's path (momentum costs
   15% per contact tick), so cover falls apart under impact just as it does
-  under fire. Indestructible cubes/pyramids still hard-stop tanks and block
-  shells, faithful to 1980.
+  under fire. This applies to ALL environment objects, including the classic
+  cubes and pyramids (user override: no indestructible class).
 - **Bunkers & buildings**: hollow interiors — blow through a wall and see the room inside; fight through rooms.
 - **Towers**: tall, top-heavy. Lose base blocks → **floor-by-floor collapse**. Falling chunks deal **crush damage** to anything beneath (telegraphed by a ground ring under the falling mass). A tower falling on a tank is a kill credit to whoever shot the base.
 - **Explosive sites**: one `ammo` cell detonating damages neighbors, which detonate… **chain reactions** are the showcase moment. Depot placement becomes a map-design lever: risky cover near a depot is cover that can delete you.

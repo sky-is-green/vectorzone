@@ -26,32 +26,30 @@ describe('ramming & shot-blocking (user direction 2026-11-25)', () => {
     expect(getCell(s.grid, 0, 0, 0)).not.toBeNull(); // untouched half stands
   });
 
-  it('indestructible solids still hard-stop a tank', () => {
+  it('classic cubes are destructible too (no indestructible class)', () => {
     const w = createWorld(21);
     w.nextSpawnTick = 1e9;
     w.nextBomberTick = 1e9;
-    // cube obstacle at (24,30) from CLASSIC_OBSTACLES
+    const cube = w.structures.find((s) => s.kind === 'cube' && s.x === 24 && s.z === 30)!;
     const t = w.tanks[0];
     t.x = 24;
     t.z = 10;
     t.heading = 0;
     for (let i = 0; i < 600; i++) stepWorld(w, [{ ...N, throttle: 1 }]);
-    expect(t.z).toBeLessThan(28);
+    expect(t.z).toBeGreaterThan(31); // plowed through, not stopped
+    expect(cube.grid.cells.filter((c) => c).length).toBe(0);
   });
 
-  it('indestructible solids block shells', () => {
+  it('shells tunnel classic solids', () => {
     const w = createWorld(21);
     w.nextSpawnTick = 1e9;
     w.nextBomberTick = 1e9;
+    const cube = w.structures.find((s) => s.kind === 'cube' && s.x === 24 && s.z === 30)!;
+    const before = cube.grid.cells.filter((c) => c).length;
     const sh: Shell = { id: 900, owner: -1, pos: [24, 0.5, 10], dir: [0, 0, 1], budget: 40, alive: true };
     w.shells.push(sh);
-    let impact = false;
-    for (let i = 0; i < 30; i++) {
-      stepWorld(w, [N]);
-      impact ||= w.events.some((e) => e.kind === 'shellImpact');
-    }
-    expect(impact).toBe(true);
-    expect(w.shells.length).toBe(0);
+    for (let i = 0; i < 30; i++) stepWorld(w, [N]);
+    expect(cube.grid.cells.filter((c) => c).length).toBeLessThan(before);
   });
 
   it('match end freezes the world', () => {

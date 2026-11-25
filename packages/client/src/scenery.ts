@@ -4,9 +4,7 @@
  * silhouette stays crisp while the arena floor fades (ENVIRONMENTS §2).
  */
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { BLOCK_SIZE, obstacleGrid, type Obstacle, type RubbleCell } from '@vectorzone/sim';
-import { buildEntityGeometry } from './geometry';
+import { BLOCK_SIZE, type RubbleCell } from '@vectorzone/sim';
 
 const DIM = 0x1d7a3a;
 const TAU = Math.PI * 2;
@@ -85,29 +83,6 @@ export function buildScenery(scene: THREE.Scene): Scenery {
   scene.add(new THREE.LineLoop(moongeo, moonMat));
 
   return { crater, mountainMat, volcanoMat, moonMat, makeGrid };
-}
-
-/** All indestructible solids merged: 2 draw calls for the whole obstacle set. */
-export function buildObstacleMeshes(
-  obstacles: Obstacle[],
-  faceMat: THREE.Material,
-  edgeMat: THREE.Material,
-): THREE.Group {
-  const faces: THREE.BufferGeometry[] = [];
-  const edges: THREE.BufferGeometry[] = [];
-  for (const o of obstacles) {
-    const g = buildEntityGeometry(obstacleGrid(o.kind));
-    g.faces.translate(o.x, 0, o.z);
-    g.edges.translate(o.x, 0, o.z);
-    faces.push(g.faces);
-    edges.push(g.edges);
-  }
-  const group = new THREE.Group();
-  group.add(
-    new THREE.Mesh(mergeGeometries(faces), faceMat),
-    new THREE.LineSegments(mergeGeometries(edges), edgeMat),
-  );
-  return group;
 }
 
 /** Settled rubble: one merged face+edge pair, rebuilt only when rubble changes. */
