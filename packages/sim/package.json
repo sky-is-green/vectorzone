@@ -1,0 +1,10 @@
+{
+  "name": "@vectorzone/sim",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Pure TypeScript game simulation. No three.js, no DOM, no Node built-ins. Runs identically in browser and Node.",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

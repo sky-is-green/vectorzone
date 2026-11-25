@@ -1,0 +1,23 @@
+{
+  "name": "vectorzone",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w packages/client",
+    "build": "npm run build -w packages/client",
+    "test": "vitest run",
+    "typecheck:sim": "tsc --noEmit -p packages/sim/tsconfig.json",
+    "check:sim": "node scripts/check-sim.mjs && npm run typecheck:sim",
+    "check:assets": "node scripts/check-assets.mjs",
+    "size": "node scripts/size.mjs",
+    "check": "npm run check:sim && npm run check:assets && npm test && npm run build && npm run size"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.2"
+  }
+}

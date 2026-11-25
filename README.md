@@ -8,7 +8,7 @@ Glowing vector-edge tanks made of destructible blocks — shoot a hole clean thr
 
 ## Status
 
-**Planning complete. Build not started.** All design decisions are locked.
+**M0 complete** (scaffold + gates + fixed-tick wireframe cube). Building milestone by milestone per `BUILD.md`.
 
 ## Documents
 

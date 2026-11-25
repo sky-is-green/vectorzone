@@ -1,0 +1,7 @@
+{
+  "name": "@vectorzone/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Self-host authoritative server. Placeholder until M7 — runs the same @vectorzone/sim as the browser host."
+}

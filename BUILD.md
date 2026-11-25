@@ -28,7 +28,7 @@
 
 **Progress checklist** (tick as gates pass):
 
-- [ ] M0 — Hello, vector
+- [x] M0 — Hello, vector
 - [ ] M1 — Block tank
 - [ ] M2 — The arena
 - [ ] M3 — Fire & destroy
