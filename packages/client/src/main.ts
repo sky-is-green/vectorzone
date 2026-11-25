@@ -8,8 +8,11 @@ import * as THREE from 'three';
 import { BLOCK_SIZE, createWorld, stepWorld, TICK_DT, type SimEvent, type TankCommand } from '@vectorzone/sim';
 import { buildEntityGeometry } from './geometry';
 import { bindInput, readCommand } from './input';
+import { PALETTES } from './palette';
 import { ParticlePool } from './particles';
+import { createPost } from './post';
 import { buildChunkGeometry, buildObstacleMeshes, buildRubbleGeometry, buildScenery } from './scenery';
+import { buildPanel, loadSettings, type Settings } from './settings';
 import './style.css';
 
 const PHOSPHOR = 0x39ff6b;
@@ -30,6 +33,7 @@ const camera = new THREE.PerspectiveCamera(
   0.1,
   2000,
 );
+const stats = document.getElementById('stats')!;
 
 // --- materials: the whole game is unlit -----------------------------------
 const faceMat = new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.DoubleSide });
@@ -102,11 +106,59 @@ const Q_HALF_TURN = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,
 bindInput();
 
 // --- M2: arena scenery, solids, pooled smoke --------------------------------
-const { crater } = buildScenery(scene);
-scene.add(buildObstacleMeshes(world.obstacles));
+const scen = buildScenery(scene);
+const settings = loadSettings();
+let grid = scen.makeGrid(PALETTES[0].gridCenter, PALETTES[0].grid);
+scene.add(grid);
+scene.add(buildObstacleMeshes(world.obstacles, faceMat, edgeMat));
 const smoke = new ParticlePool(1024, false);
 scene.add(smoke.object);
 let smokeAcc = 0;
+
+// --- M4: post chain, palettes, settings -------------------------------------
+const post = createPost(renderer, scene, camera);
+const tint = {
+  tracer: [0.6, 1, 0.7] as number[],
+  spark: [0.2, 0.9, 0.4] as number[],
+  hazard: [1, 0.35, 0.1] as number[],
+  scorch: [0.45, 0.22, 0.08] as number[],
+  smoke: [0.1, 0.35, 0.16] as number[],
+};
+
+function applySettings(s: Settings): void {
+  const P = PALETTES[s.palette % PALETTES.length];
+  edgeMat.color.setHex(P.world);
+  rubbleEdgeMat.color.setHex(P.rubble);
+  scen.mountainMat.color.setHex(P.dim);
+  scen.volcanoMat.color.setHex(P.dim);
+  scen.moonMat.color.setHex(P.moon);
+  scene.remove(grid);
+  grid.geometry.dispose();
+  (grid.material as THREE.Material).dispose();
+  grid = scen.makeGrid(P.gridCenter, P.grid);
+  scene.add(grid);
+  const c = new THREE.Color(P.world);
+  tint.tracer = [c.r * 0.7 + 0.2, c.g * 0.7 + 0.2, c.b * 0.7 + 0.2];
+  tint.spark = [c.r * 0.4, c.g * 0.9, c.b * 0.5];
+  tint.hazard = P.hazard;
+  tint.scorch = [P.hazard[0] * 0.45, P.hazard[1] * 0.45, P.hazard[2] * 0.45];
+  const d = new THREE.Color(P.dim);
+  tint.smoke = [d.r * 0.6, d.g * 0.6, d.b * 0.6];
+  stats.style.color = P.hud;
+  stats.style.textShadow = `0 0 6px ${P.hud}99`;
+  post.bloom.strength = s.bloom;
+  const u = post.crt.uniforms;
+  u.uScan.value = 0.3 * s.crt;
+  u.uVignette.value = 0.6 * s.crt;
+  u.uBarrel.value = 0.06 * s.crt;
+  u.uPersist.value = s.safe ? 0 : 0.55 * s.crt;
+  u.uRoll.value = s.safe ? 0 : 0.15 * s.crt;
+  u.uSafe.value = s.safe ? 1 : 0;
+  faceMat.visible = !s.wireframe;
+  rubbleMat.visible = !s.wireframe;
+}
+document.body.append(buildPanel(settings, PALETTES.map((p) => p.label), applySettings));
+applySettings(settings);
 
 // camera modes: periscope (rigid gun mount) / chase. C toggles.
 let chase = false;
@@ -121,7 +173,7 @@ function scorch(x: number, z: number, radius: number): void {
     smoke.spawn(
       x + Math.sin(a) * radius, 0.02, z + Math.cos(a) * radius,
       0, 0, 0,
-      20, 0.45, 0.22, 0.08, 0.5,
+      20, tint.scorch[0], tint.scorch[1], tint.scorch[2], 0.5,
       Math.cos(a), 0, -Math.sin(a),
     );
   }
@@ -147,12 +199,63 @@ const debug: { cam: { p: [number, number, number]; l: [number, number, number] }
   get rebuilds() {
     return rebuilds;
   },
+  post,
+  // numeric visual verification: render scene (or post chain) into a small
+  // target and return lit-pixel count + mean color + row variance
+  sample: (usePost: boolean) => {
+    const N = 96;
+    const size = renderer.getDrawingBufferSize(new THREE.Vector2());
+    const cx = Math.floor(size.x / 2 - N / 2);
+    const cy = Math.floor(size.y / 2 - N / 2);
+    if (usePost) {
+      post.composer.renderToScreen = false;
+      post.composer.render();
+      const buf = new Uint8Array(N * N * 4);
+      renderer.readRenderTargetPixels(post.composer.readBuffer, cx, cy, N, N, buf);
+      post.composer.renderToScreen = true;
+      return statsOf(buf, N);
+    }
+    const rt = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.UnsignedByteType });
+    renderer.setRenderTarget(rt);
+    renderer.render(scene, camera);
+    const buf = new Uint8Array(N * N * 4);
+    renderer.readRenderTargetPixels(rt, cx, cy, N, N, buf);
+    renderer.setRenderTarget(null);
+    rt.dispose();
+    return statsOf(buf, N);
+  },
 };
+
+function statsOf(buf: Uint8Array, n: number): { lit: number; mean: number[]; rowVar: number } {
+  let lit = 0;
+  const mean = [0, 0, 0];
+  const rows: number[] = new Array(n).fill(0);
+  for (let y = 0; y < n; y++) {
+    for (let x = 0; x < n; x++) {
+      const i = (y * n + x) * 4;
+      const l = buf[i] + buf[i + 1] + buf[i + 2];
+      rows[y] += l;
+      if (l > 60) {
+        lit++;
+        mean[0] += buf[i];
+        mean[1] += buf[i + 1];
+        mean[2] += buf[i + 2];
+      }
+    }
+  }
+  if (lit) {
+    mean[0] /= lit;
+    mean[1] /= lit;
+    mean[2] /= lit;
+  }
+  const rm = rows.reduce((a, b) => a + b, 0) / n;
+  const rowVar = rows.reduce((a, b) => a + (b - rm) * (b - rm), 0) / n;
+  return { lit, mean: mean.map((v) => Math.round(v)), rowVar: Math.round(rowVar) };
+}
 
 // --- fixed-timestep loop ----------------------------------------------------
 let accumulator = 0;
 let last = performance.now();
-const stats = document.getElementById('stats')!;
 let frames = 0;
 let fpsWindow = 0;
 let fps = 0;
@@ -178,14 +281,14 @@ function frame(now: number): void {
   while (smokeAcc > 1 / 3) {
     smokeAcc -= 1 / 3;
     smoke.spawn(
-      crater.x + (Math.random() - 0.5) * 14,
-      crater.y,
-      crater.z + (Math.random() - 0.5) * 14,
+      scen.crater.x + (Math.random() - 0.5) * 14,
+      scen.crater.y,
+      scen.crater.z + (Math.random() - 0.5) * 14,
       (Math.random() - 0.5) * 2,
       4 + Math.random() * 3,
       (Math.random() - 0.5) * 2,
       5 + Math.random() * 2,
-      0.1, 0.35, 0.16,
+      tint.smoke[0], tint.smoke[1], tint.smoke[2],
       1.4,
     );
   }
@@ -229,7 +332,7 @@ function frame(now: number): void {
     smoke.spawn(
       sh.pos[0], sh.pos[1], sh.pos[2],
       sh.dir[0] * 60, sh.dir[1] * 60, sh.dir[2] * 60,
-      0.06, 0.6, 1, 0.7, 2.5,
+      0.06, tint.tracer[0], tint.tracer[1], tint.tracer[2], 2.5,
     );
   }
 
@@ -242,7 +345,7 @@ function frame(now: number): void {
           ev.dir[0] * 12 + (Math.random() - 0.5) * 6,
           ev.dir[1] * 12 + (Math.random() - 0.5) * 6,
           ev.dir[2] * 12 + (Math.random() - 0.5) * 6,
-          0.15, 0.7, 1, 0.8, 0.6,
+          0.15, tint.tracer[0], tint.tracer[1], tint.tracer[2], 0.6,
         );
       }
     } else if (ev.kind === 'blockDestroyed') {
@@ -250,7 +353,7 @@ function frame(now: number): void {
         smoke.spawn(
           ev.pos[0], ev.pos[1], ev.pos[2],
           (Math.random() - 0.5) * 8, Math.random() * 6, (Math.random() - 0.5) * 8,
-          0.4, 0.2, 0.9, 0.4, 0.4,
+          0.4, tint.spark[0], tint.spark[1], tint.spark[2], 0.4,
         );
       }
     } else if (ev.kind === 'shellImpact') {
@@ -259,7 +362,7 @@ function frame(now: number): void {
         smoke.spawn(
           ev.pos[0], ev.pos[1] + 0.1, ev.pos[2],
           (Math.random() - 0.5) * 7, Math.random() * 5, (Math.random() - 0.5) * 7,
-          0.35, 0.5, 0.8, 0.4, 0.4,
+          0.35, tint.spark[0], tint.spark[1], tint.spark[2], 0.4,
         );
       }
     } else if (ev.kind === 'explosion') {
@@ -270,7 +373,7 @@ function frame(now: number): void {
         smoke.spawn(
           ev.pos[0], ev.pos[1] + 0.2, ev.pos[2],
           Math.sin(a) * s, Math.random() * 9, Math.cos(a) * s,
-          0.7, 1, 0.35, 0.1, 0.8,
+          0.7, tint.hazard[0], tint.hazard[1], tint.hazard[2], 0.8,
         );
       }
     } else if (ev.kind === 'tankKilled') {
@@ -281,7 +384,7 @@ function frame(now: number): void {
         smoke.spawn(
           ev.pos[0], ev.pos[1], ev.pos[2],
           Math.sin(a) * s, Math.random() * 12, Math.cos(a) * s,
-          1, 1, 0.4, 0.12, 0.9,
+          1, tint.hazard[0], tint.hazard[1], tint.hazard[2], 0.9,
         );
       }
     }
@@ -312,7 +415,7 @@ function frame(now: number): void {
       .multiply(Q_HALF_TURN);
   }
 
-  renderer.render(scene, camera);
+  post.render(now / 1000);
 
   frames++;
   fpsWindow += dt;
@@ -329,4 +432,5 @@ window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
+  post.resize(window.innerWidth, window.innerHeight);
 });

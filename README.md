@@ -8,7 +8,7 @@ Glowing vector-edge tanks made of destructible blocks — shoot a hole clean thr
 
 ## Status
 
-**M3 complete** (shells, penetration/blow-through, collapse, chains, rubble). Building milestone by milestone per `BUILD.md`.
+**M4 complete** (bloom, CRT shader, palettes, wireframe + safe modes, settings). Building milestone by milestone per `BUILD.md`.
 
 ## Documents
 

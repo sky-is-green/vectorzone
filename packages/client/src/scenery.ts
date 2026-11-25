@@ -9,12 +9,19 @@ import { BLOCK_SIZE, obstacleGrid, type Obstacle, type RubbleCell } from '@vecto
 import { buildEntityGeometry } from './geometry';
 
 const DIM = 0x1d7a3a;
-const PHOSPHOR = 0x39ff6b;
 const TAU = Math.PI * 2;
 
-export function buildScenery(scene: THREE.Scene): { crater: THREE.Vector3 } {
-  // arena floor: 5 m cells, fog-faded
-  scene.add(new THREE.GridHelper(400, 80, 0x0f4d24, 0x0a3319));
+export interface Scenery {
+  crater: THREE.Vector3;
+  mountainMat: THREE.LineBasicMaterial;
+  volcanoMat: THREE.LineBasicMaterial;
+  moonMat: THREE.LineBasicMaterial;
+  makeGrid: (center: number, grid: number) => THREE.GridHelper;
+}
+
+export function buildScenery(scene: THREE.Scene): Scenery {
+  // arena floor: 5 m cells, fog-faded (rebuilt on palette change)
+  const makeGrid = (center: number, grid: number) => new THREE.GridHelper(400, 80, center, grid);
 
   // mountain ring: seeded-looking silhouette from layered sines
   const pts: number[] = [];
@@ -30,7 +37,8 @@ export function buildScenery(scene: THREE.Scene): { crater: THREE.Vector3 } {
   }
   const mgeo = new THREE.BufferGeometry();
   mgeo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
-  scene.add(new THREE.LineLoop(mgeo, new THREE.LineBasicMaterial({ color: DIM, fog: false })));
+  const mountainMat = new THREE.LineBasicMaterial({ color: DIM, fog: false });
+  scene.add(new THREE.LineLoop(mgeo, mountainMat));
 
   // volcano: wireframe cone with a crater notch, on the horizon
   const a0 = 0.9;
@@ -56,7 +64,8 @@ export function buildScenery(scene: THREE.Scene): { crater: THREE.Vector3 } {
   }
   const vgeo = new THREE.BufferGeometry();
   vgeo.setAttribute('position', new THREE.Float32BufferAttribute(seg, 3));
-  scene.add(new THREE.LineSegments(vgeo, new THREE.LineBasicMaterial({ color: DIM, fog: false })));
+  const volcanoMat = new THREE.LineBasicMaterial({ color: DIM, fog: false });
+  scene.add(new THREE.LineSegments(vgeo, volcanoMat));
   const crater = new THREE.Vector3(vx, 78, vz);
 
   // crescent moon: outer arc + offset inner arc, closed
@@ -72,13 +81,18 @@ export function buildScenery(scene: THREE.Scene): { crater: THREE.Vector3 } {
   }
   const moongeo = new THREE.BufferGeometry();
   moongeo.setAttribute('position', new THREE.Float32BufferAttribute(mp, 3));
-  scene.add(new THREE.LineLoop(moongeo, new THREE.LineBasicMaterial({ color: 0x9fffc0, fog: false })));
+  const moonMat = new THREE.LineBasicMaterial({ color: 0x9fffc0, fog: false });
+  scene.add(new THREE.LineLoop(moongeo, moonMat));
 
-  return { crater };
+  return { crater, mountainMat, volcanoMat, moonMat, makeGrid };
 }
 
 /** All indestructible solids merged: 2 draw calls for the whole obstacle set. */
-export function buildObstacleMeshes(obstacles: Obstacle[]): THREE.Group {
+export function buildObstacleMeshes(
+  obstacles: Obstacle[],
+  faceMat: THREE.Material,
+  edgeMat: THREE.Material,
+): THREE.Group {
   const faces: THREE.BufferGeometry[] = [];
   const edges: THREE.BufferGeometry[] = [];
   for (const o of obstacles) {
@@ -90,11 +104,8 @@ export function buildObstacleMeshes(obstacles: Obstacle[]): THREE.Group {
   }
   const group = new THREE.Group();
   group.add(
-    new THREE.Mesh(
-      mergeGeometries(faces),
-      new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.DoubleSide }),
-    ),
-    new THREE.LineSegments(mergeGeometries(edges), new THREE.LineBasicMaterial({ color: PHOSPHOR })),
+    new THREE.Mesh(mergeGeometries(faces), faceMat),
+    new THREE.LineSegments(mergeGeometries(edges), edgeMat),
   );
   return group;
 }

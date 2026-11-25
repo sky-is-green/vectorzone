@@ -33,7 +33,7 @@
 - [x] M1 — Block tank
 - [x] M2 — The arena
 - [x] M3 — Fire & destroy
-- [ ] M4 — Phosphor
+- [x] M4 — Phosphor
 - [ ] M5 — The enemy
 - [ ] M6 — Sound
 - [ ] M7 — Multiplayer
