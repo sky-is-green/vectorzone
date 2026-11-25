@@ -1,0 +1,149 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+}
+
+canvas {
+  display: block;
+}
+
+#stats {
+  position: fixed;
+  top: 8px;
+  left: 10px;
+  z-index: 1;
+  color: #ff4433;
+  font: 12px/1.4 monospace;
+  opacity: 0.85;
+  pointer-events: none;
+  text-shadow: 0 0 6px rgba(255, 68, 51, 0.6);
+}
+
+#panel {
+  position: fixed;
+  top: 8px;
+  right: 10px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid currentColor;
+  color: #39ff6b;
+  font: 11px/1.3 monospace;
+  background: rgba(0, 0, 0, 0.6);
+  opacity: 0.9;
+}
+
+#panel .row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+#panel button {
+  background: none;
+  border: 1px solid currentColor;
+  color: inherit;
+  font: inherit;
+  padding: 1px 6px;
+  cursor: pointer;
+}
+
+#panel input[type='range'] {
+  width: 90px;
+  accent-color: currentColor;
+}
+
+#panel input[type='checkbox'] {
+  accent-color: currentColor;
+}
+
+#hud {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+#alerts {
+  position: fixed;
+  top: 96px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  pointer-events: none;
+}
+
+#alerts .alert {
+  color: inherit;
+  font: bold 14px/1.3 monospace;
+  letter-spacing: 2px;
+  text-shadow: 0 0 8px currentColor;
+  animation: alert-fade 4.2s forwards;
+}
+
+@keyframes alert-fade {
+  0% { opacity: 0; transform: translateY(-4px); }
+  8% { opacity: 1; transform: translateY(0); }
+  75% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+#gameover {
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: rgba(0, 0, 0, 0.82);
+  font: 14px/1.5 monospace;
+  text-align: center;
+}
+
+#gameover h1 {
+  font-size: 28px;
+  letter-spacing: 6px;
+  margin: 0;
+  text-shadow: 0 0 12px currentColor;
+}
+
+#gameover .final {
+  font-size: 18px;
+  letter-spacing: 3px;
+  margin: 0;
+}
+
+#gameover table {
+  border-collapse: collapse;
+  margin: 0 auto;
+}
+
+#gameover td,
+#gameover th {
+  padding: 2px 14px;
+  border-bottom: 1px solid currentColor;
+  text-align: left;
+}
+
+#gameover tr.me td {
+  text-shadow: 0 0 8px currentColor;
+  font-weight: bold;
+}
+
+#gameover .hint {
+  opacity: 0.7;
+  letter-spacing: 2px;
+  animation: alert-fade 2s infinite;
+}
