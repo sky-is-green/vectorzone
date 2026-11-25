@@ -25,6 +25,7 @@
 5. **Zero asset files.** No textures, models, fonts, or audio files. Everything procedural. (SVG favicon is the only exception.)
 6. **No new runtime dependencies** without checking the weight budget (§1) and recording the justification.
 7. Write `docs/learn/mN.md` per milestone: concepts used, decisions made, deviations flagged. These are a deliverable, not optional.
+8. **Feel is human-verified.** Automated probes gate mechanics; `docs/PLAYTEST.md` gates feel. Never mark a feel gate passed on automated evidence alone.
 
 **Progress checklist** (tick as gates pass):
 
@@ -107,8 +108,9 @@ vectorzone/
 4. `npm run dev` + **browser smoke**: page loads, **zero console errors**, the milestone's acceptance visuals are present, window resize works, controls respond. If browser automation is available, screenshot and inspect; otherwise verify interactively and record what you saw in the learning notes.
 5. **Draw-call gate**: load the milestone's heaviest scene; stats overlay must show < 100 calls.
 6. **FPS sanity**: no sustained drops in the heaviest scene (stats overlay).
-7. Write `docs/learn/mN.md` (concepts, decisions, deviations).
-8. Commit: `M<n>: <imperative summary>`; tick the checklist in this file.
+7. **Human play-test (feel gate)** at M1, M3, M5, M7, M8 and after any controls/camera/tuning change: run `docs/PLAYTEST.md` with a human; record results in `docs/learn/playtest-<date>.md`. Automated probes verify mechanics, never feel. Feel issues are logged with hypotheses and resolved after human confirmation — not guessed fixes.
+8. Write `docs/learn/mN.md` (concepts, decisions, deviations).
+9. Commit: `M<n>: <imperative summary>`; tick the checklist in this file.
 
 **Any red gate → fix before proceeding.**
 
