@@ -65,8 +65,18 @@ function refreshBody(body: Body, grid: typeof tank.hull): void {
 const hull = makeBody(tank.hull);
 const turret = makeBody(tank.turret);
 turret.group.position.set(tank.turretPivot.x, tank.turretPivot.y, tank.turretPivot.z);
+// real turret order: yaw about the vertical, THEN pitch about the traversed
+// horizontal axis. Default XYZ Euler order couples them wrongly (F1).
+turret.group.rotation.order = 'YXZ';
 hull.group.add(turret.group);
 scene.add(hull.group);
+
+// Rigid gun mount (F1 fix): the camera is the turret transform composed with
+// a fixed local offset — exactly as if parented to the gun. It swings with
+// yaw AND pitch, so aim and view can never disagree.
+const GUN_EYE = new THREE.Vector3(0, tank.turret.size.y * BLOCK_SIZE + 0.25, -0.9);
+// three cameras look down their -Z; our gun points +Z, hence the half-turn.
+const Q_HALF_TURN = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
 
 bindInput();
 
@@ -75,7 +85,13 @@ bindInput();
 const debug: { cam: { p: [number, number, number]; l: [number, number, number] } | null } = {
   cam: null,
 };
-(window as unknown as Record<string, unknown>).__vz = { world, renderer, debug };
+(window as unknown as Record<string, unknown>).__vz = {
+  world,
+  renderer,
+  debug,
+  camera,
+  turretObj: turret.group,
+};
 
 // --- fixed-timestep loop ----------------------------------------------------
 let accumulator = 0;
@@ -105,22 +121,16 @@ function frame(now: number): void {
   turret.group.rotation.y = tank.turretYaw;
   turret.group.rotation.x = -tank.gunPitch; // +pitch = barrel up
 
-  // camera rides the turret: eye just behind/above the mount, looking down the aim
-  const yaw = tank.heading + tank.turretYaw;
-  const pitch = tank.gunPitch;
-  const eyeY = tank.turretPivot.y + tank.turret.size.y * BLOCK_SIZE + 0.25;
-  const ex = tank.x - 0.9 * Math.sin(yaw);
-  const ez = tank.z - 0.9 * Math.cos(yaw);
+  // camera = rigid gun mount (see GUN_EYE above); debug override stays world-space
   if (debug.cam) {
     camera.position.set(...debug.cam.p);
     camera.lookAt(...debug.cam.l);
   } else {
-    camera.position.set(ex, eyeY, ez);
-    camera.lookAt(
-      ex + Math.sin(yaw) * Math.cos(pitch) * 30,
-      eyeY + Math.sin(pitch) * 30,
-      ez + Math.cos(yaw) * Math.cos(pitch) * 30,
-    );
+    turret.group.updateWorldMatrix(true, false);
+    camera.position.copy(GUN_EYE).applyMatrix4(turret.group.matrixWorld);
+    camera.quaternion
+      .setFromRotationMatrix(turret.group.matrixWorld)
+      .multiply(Q_HALF_TURN);
   }
 
   renderer.render(scene, camera);
