@@ -6,9 +6,30 @@ Glowing vector-edge tanks made of destructible blocks — shoot a hole clean thr
 
 **Positioning:** a fleshed-out, ultra-light tech demo. A 10-minute experience, not a live service. No textures, no models, no audio files — everything procedural. Target: **< 300 KB gzipped, 60 fps on integrated graphics.**
 
+## Play it
+
+**Live: https://sky-is-green.github.io/vectorzone/** (static client, zero install)
+
+| Input | Action |
+|---|---|
+| W / S | throttle forward / reverse |
+| A / D | rotate hull |
+| ← / → | rotate turret |
+| ↑ / ↓ | gun elevation |
+| Space | fire |
+| C | periscope / chase camera |
+| X | AI debug overlay |
+| R | restart (after match end) |
+| Gamepad | left stick drive, right stick aim, A/RT fire |
+
+Everything is destructible: ram it, shoot it, undermine it. Watch the radar —
+it only shows what fires or comes within 30 m. The volcano erupts in the final
+two minutes of a 10-minute match. Settings (top right): phosphor palette,
+wireframe mode, safe mode, bloom/CRT, shake, FOV, resolution, arena.
+
 ## Status
 
-**M5 complete** (AI, awareness/radar, bomber, volcano, fences, HUD, solo loop). Building milestone by milestone per `BUILD.md`.
+**M8 complete** (polish + deployed to GitHub Pages). Remaining: M6 sound, M7 multiplayer (last, per user sequence).
 
 ## Documents
 

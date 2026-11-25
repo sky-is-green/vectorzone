@@ -40,7 +40,7 @@ M7 multiplayer; sound and multiplayer are the last two milestones.**
 - [x] M5 — The enemy
 - [ ] M6 — Sound
 - [ ] M7 — Multiplayer
-- [ ] M8 — Polish & ship
+- [x] M8 — Polish & ship
 
 ---
 
