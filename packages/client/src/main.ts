@@ -380,7 +380,14 @@ function frame(now: number): void {
   // --- M3 sync: structures, rubble, chunks, dead tank ------------------------
   hull.group.visible = tank.alive;
   for (const s of world.structures) {
-    const b = structureBodies.get(s.id)!;
+    let b = structureBodies.get(s.id);
+    if (!b) {
+      // eruption rock clusters arrive mid-match: create their body on first sight
+      b = makeBody(s.grid);
+      b.group.position.set(s.x, 0, s.z);
+      scene.add(b.group);
+      structureBodies.set(s.id, b);
+    }
     refreshBody(b, s.grid);
   }
   if (world.rubbleRev !== rubbleRev) {
@@ -487,6 +494,19 @@ function frame(now: number): void {
       );
     }
   }
+  // lava pools pulse hazard-orange while they burn
+  for (const pool of world.lavaPools) {
+    const pulse = 0.5 + 0.5 * Math.sin(now / 120);
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * Math.PI * 2 + now / 900;
+      smoke.spawn(
+        pool.x + Math.sin(a) * pool.radius, 0.06, pool.z + Math.cos(a) * pool.radius,
+        0, 0.6, 0,
+        0.14, tint.hazard[0] * pulse, tint.hazard[1] * pulse, tint.hazard[2] * pulse, 0.6,
+        Math.cos(a), 0, -Math.sin(a),
+      );
+    }
+  }
   // AI debug overlay: intent, LOS, aim cone (X toggles)
   debugLines.visible = debugAi;
   if (debugAi) {
@@ -522,6 +542,7 @@ function frame(now: number): void {
     else if (ev.kind === 'volcanoRumble') hud.alert('VOLCANO RUMBLING — ERUPTION IMMINENT');
     else if (ev.kind === 'volcanoErupt') hud.alert('ERUPTION');
     else if (ev.kind === 'matchEnd') hud.alert('MATCH COMPLETE');
+    else if (ev.kind === 'kill' && ev.what === 'bomber') hud.alert('BOMBER DOWN');
     else if (ev.kind === 'bombTelegraph') lastBombBlip = now;
     if (ev.kind === 'fire') {
       for (let i = 0; i < 8; i++) {
@@ -628,6 +649,7 @@ function frame(now: number): void {
   hud.draw({
     tick: world.tick,
     heading: tank.heading,
+    turretYaw: tank.turretYaw,
     x: tank.x,
     z: tank.z,
     known: world.awareness.get(0),

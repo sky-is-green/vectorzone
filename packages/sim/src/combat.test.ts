@@ -129,6 +129,8 @@ describe('rubble', () => {
 describe('firing & determinism with combat', () => {
   it('space fires on cooldown and the shell travels', () => {
     const w = createWorld(1);
+    w.nextSpawnTick = 1e9; // isolate: no director spawns/AI shells
+    w.nextBomberTick = 1e9;
     stepWorld(w, [cmd({ fire: true })]);
     expect(w.shells.length).toBe(1);
     expect(w.events.some((e) => e.kind === 'fire')).toBe(true);

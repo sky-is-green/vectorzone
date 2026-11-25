@@ -91,6 +91,28 @@ function makeWall() {
   return makeStructure(600, 'tower', 0, 35);
 }
 
+describe('director: enemies come to you', () => {
+  it('first enemy spawns within sight range, acquires contact, and closes in', () => {
+    const w = createWorld(11);
+    w.nextBomberTick = 1e9;
+    let spawned = false;
+    let acquired = false;
+    for (let i = 0; i < 900; i++) {
+      stepWorld(w, [N]);
+      const e = w.tanks[1];
+      if (e) {
+        spawned = true;
+        if (w.awareness.get(e.id)?.has(0)) acquired = true;
+      }
+    }
+    expect(spawned).toBe(true);
+    expect(acquired).toBe(true);
+    const e = w.tanks[1];
+    const d1 = Math.hypot(e.x - w.tanks[0].x, e.z - w.tanks[0].z);
+    expect(d1).toBeLessThan(140); // closed in from the 100-140 m spawn ring
+  });
+});
+
 describe('bomber (AI.md §5.4)', () => {
   it('spawns on cadence, flies straight, telegraphs bombs >= 1.5 s before impact', () => {
     const w = createWorld(9);
@@ -127,14 +149,17 @@ describe('bomber (AI.md §5.4)', () => {
     const t = w.tanks[0];
     t.gunPitch = 1.05;
     let killed = false;
+    let airburst = false;
     for (let i = 0; i < 400 && !killed; i++) {
       b.pos[0] = t.x + Math.sin(t.heading) * 8.6;
       b.pos[2] = t.z + Math.cos(t.heading) * 8.6;
       b.pos[1] = 15;
       stepWorld(w, [{ ...N, fire: true }]);
       killed = w.events.some((e) => e.kind === 'kill' && e.what === 'bomber');
+      airburst ||= w.events.some((e) => e.kind === 'explosion' && e.pos[1] > 10);
     }
     expect(killed).toBe(true);
+    expect(airburst).toBe(true); // visible feedback, not a silent disappear
     expect(w.score).toBeGreaterThanOrEqual(1000);
   });
 

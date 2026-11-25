@@ -44,6 +44,10 @@ describe('match clock & volcano (user direction 2026-11-25)', () => {
     expect(eruptAt).toBeGreaterThan(0);
     expect(bombAt).toBeGreaterThan(eruptAt);
     expect(aftermath).toBe(true);
+    // rock cover must survive its own creating explosion
+    for (const s of w.structures.filter((s) => s.kind === 'rocks')) {
+      expect(s.grid.cells.some((c) => c)).toBe(true);
+    }
   });
 
   it('match ends at 10 minutes', () => {

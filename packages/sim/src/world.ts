@@ -122,7 +122,7 @@ export function createWorld(seed: number): World {
     score: 0,
     lives: 3,
     phase: 'play',
-    nextSpawnTick: 300,
+    nextSpawnTick: 120,
     nextBomberTick: BOMBER_PERIOD,
     respawnTick: 0,
     nextLifeAt: 10000,

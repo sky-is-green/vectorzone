@@ -58,7 +58,9 @@ export function stepDirector(w: World): void {
     if (!activeEnemy && w.tick >= w.nextSpawnTick) {
       const kind = pickKind(w.score, w.rng.next());
       const a = w.rng.next() * Math.PI * 2;
-      const r = 150 + w.rng.next() * 40;
+      // spawn INSIDE sight range so enemies acquire you and come to you
+      // (faithful to 1980); beyond it they would patrol idle forever
+      const r = 100 + w.rng.next() * 40;
       const x = clamp(Math.sin(a) * r, -190, 190);
       const z = clamp(Math.cos(a) * r, -190, 190);
       if (kind === 'missile') {
@@ -130,6 +132,7 @@ function stepMissiles(w: World): void {
         m.alive = false;
         sh.alive = false;
         w.events.push({ kind: 'kill', id: m.id, what: 'missile', by: sh.owner });
+        w.events.push({ kind: 'explosion', pos: [m.pos[0], m.pos[1], m.pos[2]], radius: 1.5 });
         break;
       }
     }
@@ -179,6 +182,8 @@ function stepBomber(w: World): void {
       if (b.hp <= 0) {
         b.alive = false;
         w.events.push({ kind: 'kill', id: b.id, what: 'bomber', by: sh.owner });
+        // airburst: visible feedback that you hit it (no ground damage)
+        w.events.push({ kind: 'explosion', pos: [b.pos[0], b.pos[1], b.pos[2]], radius: 3 });
       }
       break;
     }

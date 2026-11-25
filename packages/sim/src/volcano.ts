@@ -68,11 +68,15 @@ export function stepVolcano(w: World): void {
   }
 }
 
-/** Bomb impacts leave lava (DoT) or fresh rock cover (design: both). */
+/** Bomb impacts leave lava (DoT) or fresh rock cover (design: both).
+ * Rocks land BESIDE the crater — at the centre the creating explosion
+ * would instantly destroy them. */
 export function bombAftermath(w: World, x: number, z: number): void {
   if (w.rng.next() < 0.5) {
     w.lavaPools.push({ x, z, radius: 2.5, untilTick: w.tick + 720 });
   } else {
-    w.structures.push(makeStructure(w.nextId++, 'rocks', x, z));
+    const rx = Math.max(-190, Math.min(190, x + 3.5));
+    const rz = Math.max(-190, Math.min(190, z + 3.5));
+    w.structures.push(makeStructure(w.nextId++, 'rocks', rx, rz));
   }
 }

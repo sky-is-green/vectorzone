@@ -10,6 +10,7 @@ import type { Palette } from './palette';
 export interface HudState {
   tick: number;
   heading: number;
+  turretYaw: number;
   x: number;
   z: number;
   known: Map<number, Known> | undefined;
@@ -92,6 +93,19 @@ export function createHud(): {
     ctx.moveTo(cx, cy);
     ctx.lineTo(cx + Math.sin(sweep) * RADAR_R, cy - Math.cos(sweep) * RADAR_R);
     ctx.stroke();
+    // own hull arrow (up = forward) + turret aim tick
+    ctx.strokeStyle = P.worldCss;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - 6);
+    ctx.lineTo(cx - 4, cy + 4);
+    ctx.lineTo(cx + 4, cy + 4);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.strokeStyle = hud;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.sin(s.turretYaw) * 11, cy - Math.cos(s.turretYaw) * 11);
+    ctx.stroke();
 
     if (s.storm) {
       ctx.fillStyle = hud + '66';
@@ -120,6 +134,13 @@ export function createHud(): {
         ctx.beginPath();
         ctx.arc(cx + rx, cy + ry, r, 0, Math.PI * 2);
         ctx.fill();
+        // contact heading tick (relative to our hull)
+        const a = k.heading - s.heading;
+        ctx.strokeStyle = P.worldCss + Math.floor(fade * 200).toString(16).padStart(2, '0');
+        ctx.beginPath();
+        ctx.moveTo(cx + rx, cy + ry);
+        ctx.lineTo(cx + rx + Math.sin(a) * 5, cy + ry - Math.cos(a) * 5);
+        ctx.stroke();
       }
       if (s.bomberBlip) {
         ctx.fillStyle = hud;
