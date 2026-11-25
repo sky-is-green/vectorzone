@@ -29,7 +29,7 @@
 **Progress checklist** (tick as gates pass):
 
 - [x] M0 — Hello, vector
-- [ ] M1 — Block tank
+- [x] M1 — Block tank
 - [ ] M2 — The arena
 - [ ] M3 — Fire & destroy
 - [ ] M4 — Phosphor
@@ -141,7 +141,7 @@ Each milestone lists: **Read** (design sections), **Build**, **Accept** (objecti
 **Accept:**
 - A1: tank visibly reads as an assembly of blocks in the solid-vector look.
 - A2: WASD drives the hull; arrows rotate/aim the turret independently; camera follows the turret.
-- A3: the tank costs exactly **2 draw calls**.
+- A3: the tank costs exactly **4 draw calls** (2 per rigid body: hull + turret).
 - A4: unit tests pass for grid ops, movement math, command application.
 - A5: determinism test passes (same seed + commands → same state hash).
 - A6: `check:sim` green.

@@ -69,7 +69,7 @@ This is cheap: black unlit faces need no lights at all. The whole game is `MeshB
 
 Naively, 300 blocks × (mesh + lines) × 10 tanks = 6,000 draw calls. Instead:
 
-- **Per entity, merge everything into ONE face geometry + ONE line geometry.** Two draw calls per tank, two per structure.
+- **Per rigid body, merge everything into ONE face geometry + ONE line geometry.** Two draw calls per body: a tank is hull + rotating turret = 4, a structure = 2. (Resolved M1: the independently-aimed turret cannot share static hull geometry.)
 - **Cull interior faces/edges**: only emit a block face where the neighboring cell is empty (Minecraft-style). Fewer triangles, and when a neighbor is destroyed the newly exposed interior faces appear automatically on rebuild.
 - Rebuild the merged geometry **only when damage occurs** (a few times per second at most), never per frame. A few hundred blocks rebuild in well under a millisecond.
 - Debris and particles: one pooled `LineSegments` cloud for the whole scene.
@@ -253,7 +253,7 @@ vectorzone/
 
 ## 12. Performance & weight budget
 
-- Draw calls: ~2 per tank + 2 per structure + ground/horizon/particles/HUD → **< 100 total**.
+- Draw calls: ~4 per tank (hull + turret) + 2 per structure + ground/horizon/particles/HUD → **< 100 total**.
 - No lights, no shadows, no textures, no PBR — unlit materials only.
 - Geometry rebuilds only on damage; particles pooled; snapshots delta'd if needed.
 - Bundle: three core ~170 KB gz + bloom/CRT + game code + PixelQR engine (~35–45 KB gz, jsQR excluded) → **target < 300 KB gz initial load** (watch the margin at M7).

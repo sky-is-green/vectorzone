@@ -8,7 +8,7 @@ Glowing vector-edge tanks made of destructible blocks — shoot a hole clean thr
 
 ## Status
 
-**M0 complete** (scaffold + gates + fixed-tick wireframe cube). Building milestone by milestone per `BUILD.md`.
+**M1 complete** (drivable block tank, merged geometry, controls). Building milestone by milestone per `BUILD.md`.
 
 ## Documents
 
