@@ -53,7 +53,7 @@ tuning. A milestone with an un-run play-test is not fully done (BUILD.md §3).
 
 | ID | Opened | Milestone | Observation | Hypotheses | Status |
 |---|---|---|---|---|---|
-| F1 | 2026-11-25 | M1 | Turret controls "acted strangely" in human use (mechanics probes all passed) | **Root cause found by user:** camera was an analytic approximation of the turret, not attached to the gun — look-direction diverged from the barrel axis under combined yaw+pitch, and the eye didn't swing with elevation. Secondary: default XYZ Euler order coupled turret yaw/pitch wrongly. **Fix:** rigid gun mount (camera = turret world transform ∘ fixed local offset) + turret rotation order `YXZ`. Verified: camera/barrel axis dot = 1 at rest, combined yaw+pitch, and after hull turns; eye swings with pitch. | **fix implemented — awaiting human feel re-confirm** |
+| F1 | 2026-11-25 | M1 | Turret controls "acted strangely" in human use (mechanics probes all passed) | **Root cause found by user:** camera was an analytic approximation of the turret, not attached to the gun — look-direction diverged from the barrel axis under combined yaw+pitch, and the eye didn't swing with elevation. Secondary: default XYZ Euler order coupled turret yaw/pitch wrongly. **Fix:** rigid gun mount (camera = turret world transform ∘ fixed local offset) + turret rotation order `YXZ`. Verified: camera/barrel axis dot = 1 at rest, combined yaw+pitch, and after hull turns; eye swings with pitch. **Human re-confirm 2026-11-25: "much better, turret mechanics are complete."** | **CLOSED** |
 
 ## Rule
 

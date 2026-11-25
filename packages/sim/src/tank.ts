@@ -11,6 +11,7 @@ import {
   parseLayout,
   type BlockGrid,
 } from './grid';
+import { collideObstacles, type Obstacle } from './arena';
 
 export interface TankCommand {
   throttle: number; // [-1, 1]
@@ -126,7 +127,13 @@ export function createTank(id: number, x: number, z: number, heading: number): T
 }
 
 /** One fixed tick of tank kinematics. Pure data in, pure data out. */
-export function stepTank(t: Tank, cmd: TankCommand, dt: number, arenaHalf: number): void {
+export function stepTank(
+  t: Tank,
+  cmd: TankCommand,
+  dt: number,
+  arenaHalf: number,
+  obstacles: Obstacle[] = [],
+): void {
   const target = clamp(cmd.throttle, -1, 1) * t.stats.topSpeed;
   const maxDv = t.stats.accel * dt;
   t.speed += clamp(target - t.speed, -maxDv, maxDv);
@@ -139,6 +146,7 @@ export function stepTank(t: Tank, cmd: TankCommand, dt: number, arenaHalf: numbe
   const lim = arenaHalf - 1.5;
   t.x = clamp(t.x, -lim, lim);
   t.z = clamp(t.z, -lim, lim);
+  collideObstacles(t, obstacles);
 
   t.turretYaw += clamp(cmd.turretYaw, -1, 1) * t.stats.turretSlew * dt;
   t.gunPitch = clamp(

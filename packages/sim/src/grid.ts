@@ -103,17 +103,18 @@ export function countType(g: BlockGrid, type: BlockType): number {
 /**
  * Parse a hand-authored layout: layers[y][z] is a string over x.
  * '.' = empty, H/T/G/E/C/A = block types. Readable, diffable, tunable.
+ * Tolerant: layers may shrink (stepped pyramids); missing rows/chars = empty.
  */
 export function parseLayout(layers: string[][]): BlockGrid {
   const y = layers.length;
-  const z = layers[0].length;
-  const x = layers[0][0].length;
+  const z = Math.max(...layers.map((l) => l.length));
+  const x = Math.max(...layers.map((l) => Math.max(...l.map((r) => r.length))));
   const g = createGrid({ x, y, z });
   for (let iy = 0; iy < y; iy++) {
     for (let iz = 0; iz < z; iz++) {
-      const row = layers[iy][iz];
+      const row = layers[iy][iz] ?? '';
       for (let ix = 0; ix < x; ix++) {
-        const t = CHAR_TYPE[row[ix]];
+        const t = CHAR_TYPE[row[ix] ?? '.'];
         if (t) g.cells[cellIndex(g, ix, iy, iz)] = { type: t, hp: BLOCK_HP[t] };
       }
     }

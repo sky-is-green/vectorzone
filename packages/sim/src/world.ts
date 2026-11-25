@@ -1,5 +1,6 @@
 import { createRng, type Rng } from './rng';
 import { createTank, neutralCommand, stepTank, type Tank, type TankCommand } from './tank';
+import { CLASSIC_OBSTACLES, type Obstacle } from './arena';
 
 /**
  * The world: everything the sim owns. M1 = one drivable tank in a bounded
@@ -11,6 +12,7 @@ export interface World {
   tick: number;
   rng: Rng;
   arenaHalf: number; // metres; arena is 2*arenaHalf square (PLAN: 400×400)
+  obstacles: Obstacle[];
   tanks: Tank[];
 }
 
@@ -24,6 +26,7 @@ export function createWorld(seed: number): World {
     tick: 0,
     rng: createRng(seed),
     arenaHalf: 200,
+    obstacles: CLASSIC_OBSTACLES,
     tanks: [createTank(0, 0, 0, 0)],
   };
 }
@@ -32,7 +35,7 @@ export function createWorld(seed: number): World {
 export function stepWorld(w: World, commands: TankCommand[] = []): void {
   w.tick += 1;
   for (let i = 0; i < w.tanks.length; i++) {
-    stepTank(w.tanks[i], commands[i] ?? neutralCommand(), TICK_DT, w.arenaHalf);
+    stepTank(w.tanks[i], commands[i] ?? neutralCommand(), TICK_DT, w.arenaHalf, w.obstacles);
   }
 }
 

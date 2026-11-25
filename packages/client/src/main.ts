@@ -5,9 +5,11 @@
  * See docs/learn/m1.md for the concepts.
  */
 import * as THREE from 'three';
-import { BLOCK_SIZE, createWorld, stepWorld, TICK_DT } from '@vectorzone/sim';
+import { BLOCK_SIZE, createWorld, stepWorld, TICK_DT, type TankCommand } from '@vectorzone/sim';
 import { buildEntityGeometry } from './geometry';
 import { bindInput, readCommand } from './input';
+import { ParticlePool } from './particles';
+import { buildObstacleMeshes, buildScenery } from './scenery';
 import './style.css';
 
 const PHOSPHOR = 0x39ff6b;
@@ -20,6 +22,7 @@ document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000000);
+scene.fog = new THREE.Fog(0x000000, 60, 260); // floor fades; horizon ignores fog
 
 const camera = new THREE.PerspectiveCamera(
   60,
@@ -80,6 +83,19 @@ const Q_HALF_TURN = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,
 
 bindInput();
 
+// --- M2: arena scenery, solids, pooled smoke --------------------------------
+const { crater } = buildScenery(scene);
+scene.add(buildObstacleMeshes(world.obstacles));
+const smoke = new ParticlePool(1024, false);
+scene.add(smoke.object);
+let smokeAcc = 0;
+
+// camera modes: periscope (rigid gun mount) / chase. C toggles.
+let chase = false;
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'KeyC') chase = !chase;
+});
+
 // dev/test hook (used by the browser verification probes).
 // debug.cam overrides the camera rig for screenshots; null = normal rig.
 const debug: { cam: { p: [number, number, number]; l: [number, number, number] } | null } = {
@@ -91,6 +107,12 @@ const debug: { cam: { p: [number, number, number]; l: [number, number, number] }
   debug,
   camera,
   turretObj: turret.group,
+  // synchronous sim stepping for deterministic browser probes (wall-time
+  // probes are unreliable: background tabs throttle rAF and the dt clamp
+  // rightly refuses to fast-forward)
+  step: (commands: TankCommand[], ticks: number) => {
+    for (let i = 0; i < ticks; i++) stepWorld(world, commands);
+  },
 };
 
 // --- fixed-timestep loop ----------------------------------------------------
@@ -115,6 +137,24 @@ function frame(now: number): void {
   refreshBody(hull, tank.hull);
   refreshBody(turret, tank.turret);
 
+  // dormant volcano smoke: ~3 wisps/sec, cosmetic randomness lives client-side
+  smokeAcc += dt;
+  while (smokeAcc > 1 / 3) {
+    smokeAcc -= 1 / 3;
+    smoke.spawn(
+      crater.x + (Math.random() - 0.5) * 14,
+      crater.y,
+      crater.z + (Math.random() - 0.5) * 14,
+      (Math.random() - 0.5) * 2,
+      4 + Math.random() * 3,
+      (Math.random() - 0.5) * 2,
+      5 + Math.random() * 2,
+      0.1, 0.35, 0.16,
+      1.4,
+    );
+  }
+  smoke.update(dt);
+
   // sync transforms from sim state
   hull.group.position.set(tank.x, 0, tank.z);
   hull.group.rotation.y = tank.heading;
@@ -125,6 +165,13 @@ function frame(now: number): void {
   if (debug.cam) {
     camera.position.set(...debug.cam.p);
     camera.lookAt(...debug.cam.l);
+  } else if (chase) {
+    camera.position.set(
+      tank.x - Math.sin(tank.heading) * 12,
+      6.5,
+      tank.z - Math.cos(tank.heading) * 12,
+    );
+    camera.lookAt(tank.x, 1.2, tank.z);
   } else {
     turret.group.updateWorldMatrix(true, false);
     camera.position.copy(GUN_EYE).applyMatrix4(turret.group.matrixWorld);
@@ -142,7 +189,7 @@ function frame(now: number): void {
     frames = 0;
     fpsWindow = 0;
   }
-  stats.textContent = `FPS ${fps} · calls ${renderer.info.render.calls} · tick ${world.tick} · v ${tank.speed.toFixed(1)} m/s`;
+  stats.textContent = `FPS ${fps} · calls ${renderer.info.render.calls} · tick ${world.tick} · v ${tank.speed.toFixed(1)} m/s · ${chase ? 'chase' : 'scope'} [C]`;
 }
 requestAnimationFrame(frame);
 

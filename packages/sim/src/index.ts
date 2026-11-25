@@ -37,3 +37,10 @@ export {
   TICK_DT,
   type World,
 } from './world';
+export {
+  CLASSIC_OBSTACLES,
+  obstacleGrid,
+  makeObstacle,
+  collideObstacles,
+  type Obstacle,
+} from './arena';
