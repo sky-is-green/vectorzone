@@ -31,6 +31,7 @@ import { stepAwareness, type Known } from './awareness';
 import { thinkBrain, AI_KNOBS, type AiBrain } from './ai';
 import { BOMBER_PERIOD, SCORE_VALUES, stepDirector, type Bomber, type Missile, type Telegraph } from './director';
 import { createVolcano, stepVolcano, type LavaPool, type Volcano } from './volcano';
+import { CLASSIC_FENCES, fenceAlive, fenceHitT, fencePush, type Fence } from './fence';
 import { MATCH_TICKS } from './combat';
 
 export interface RubbleCell {
@@ -70,6 +71,7 @@ export interface World {
   missiles: Missile[];
   bomber: Bomber | null;
   telegraphs: Telegraph[];
+  fences: Fence[];
   volcano: Volcano;
   lavaPools: LavaPool[];
   stormUntil: number;
@@ -107,6 +109,7 @@ export function createWorld(seed: number): World {
     missiles: [],
     bomber: null,
     telegraphs: [],
+    fences: CLASSIC_FENCES.map((f) => ({ ...f })),
     volcano: createVolcano(),
     lavaPools: [],
     stormUntil: 0,
@@ -194,6 +197,19 @@ function stepShells(w: World, damaged: Damaged): void {
   const ctxs = gridCtxs(w);
   for (const sh of w.shells) {
     if (!sh.alive) continue;
+    // energy fences block shells while both pylons stand
+    let tF = Infinity;
+    for (const f of w.fences) {
+      if (!fenceAlive(w, f)) continue;
+      const t = fenceHitT(f, sh.pos, sh.dir, step);
+      if (t !== null && t < tF) tF = t;
+    }
+    if (tF !== Infinity) {
+      sh.pos = add(sh.pos, mul(sh.dir, tF));
+      sh.alive = false;
+      w.events.push({ kind: 'shellImpact', pos: [...sh.pos] });
+      continue;
+    }
     const cands: { t: number; ctx: GridCtx; cell: V3 }[] = [];
     for (const ctx of ctxs) {
       if (ctx.tank && ctx.tank.id === sh.owner) continue;
@@ -394,6 +410,15 @@ export function stepWorld(w: World, commands: TankCommand[] = []): void {
   stepShells(w, damaged);
   stepDirector(w);
   stepVolcano(w);
+  // scan towers ping everyone onto every radar while they stand
+  if (w.tick % 600 === 0) {
+    for (const s of w.structures) {
+      if (s.kind === 'scan' && s.grid.cells.some((c) => c)) {
+        w.events.push({ kind: 'scanPing' });
+        break;
+      }
+    }
+  }
   stepExplosions(w, damaged);
   // ramming: destructible structures fall apart instead of stopping the tank
   // (indestructible solids still hard-stop, faithful to 1980)
@@ -425,6 +450,16 @@ export function stepWorld(w: World, commands: TankCommand[] = []): void {
         }
       }
       if (smashed) t.speed *= 0.85; // plowing through costs momentum, not a stop
+    }
+    // energy fences hard-stop tanks until a pylon falls
+    for (const f of w.fences) {
+      if (!fenceAlive(w, f)) continue;
+      const push = fencePush(f, t.x, t.z, (t.hull.size.z * BLOCK_SIZE) / 2);
+      if (push) {
+        t.x += push.x;
+        t.z += push.z;
+        t.speed *= 0.5;
+      }
     }
   }
   // lava pools burn tanks standing in them (1 hp / 0.5 s)
@@ -499,6 +534,7 @@ export function hashWorld(w: World): string {
     `tel${w.telegraphs.length}`,
     `vol${w.volcano.state}`,
     `lava${w.lavaPools.length}`,
+    `fen${w.fences.filter((f) => fenceAlive(w, f)).length}`,
   );
   const s = parts.join(';');
   let h = 0x811c9dc5;

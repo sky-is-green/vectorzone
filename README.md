@@ -8,7 +8,7 @@ Glowing vector-edge tanks made of destructible blocks — shoot a hole clean thr
 
 ## Status
 
-**M4 complete** (bloom, CRT shader, palettes, wireframe + safe modes, settings). Building milestone by milestone per `BUILD.md`.
+**M5 complete** (AI, awareness/radar, bomber, volcano, fences, HUD, solo loop). Building milestone by milestone per `BUILD.md`.
 
 ## Documents
 

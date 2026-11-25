@@ -7,7 +7,7 @@ import { getCell, parseLayout, setCell, type BlockGrid } from './grid';
 import { SOLID_PLACEMENTS, solidGrid, type SolidKind } from './arena';
 import type { V3 } from './raycast';
 
-export type StructureKind = 'wall' | 'bunker' | 'tower' | 'depot' | 'rocks' | SolidKind;
+export type StructureKind = 'wall' | 'bunker' | 'tower' | 'depot' | 'rocks' | 'scan' | 'pylon' | SolidKind;
 
 export interface Structure {
   id: number;
@@ -50,6 +50,21 @@ const ROCKS: string[][] = [
   ['HH.', '.H.', '...'],
 ];
 
+const SCAN: string[][] = [
+  ['HHH', 'HHH', 'HHH'],
+  ['.H.', '.H.', '.H.'],
+  ['.H.', '.H.', '.H.'],
+  ['GGG', 'GGG', 'GGG'],
+  ['.G.', '.G.', '.G.'],
+];
+
+const PYLON: string[][] = [
+  ['H'],
+  ['H'],
+  ['H'],
+  ['G'],
+];
+
 export function structureGrid(kind: StructureKind): BlockGrid {
   switch (kind) {
     case 'wall': return parseLayout(WALL);
@@ -57,6 +72,8 @@ export function structureGrid(kind: StructureKind): BlockGrid {
     case 'tower': return parseLayout(TOWER);
     case 'depot': return parseLayout(DEPOT);
     case 'rocks': return parseLayout(ROCKS);
+    case 'scan': return parseLayout(SCAN);
+    case 'pylon': return parseLayout(PYLON);
     case 'cube': return solidGrid('cube');
     case 'pyramid': return solidGrid('pyramid');
   }
@@ -73,6 +90,9 @@ export const CLASSIC_STRUCTURES: Structure[] = [
   makeStructure(102, 'bunker', -55, 40),
   makeStructure(103, 'tower', 70, -70),
   makeStructure(104, 'depot', 15, -55),
+  makeStructure(105, 'scan', -40, -80),
+  makeStructure(106, 'pylon', -6, 70),
+  makeStructure(107, 'pylon', 6, 70),
   // the faithful cubes & pyramids — destructible like everything else
   ...SOLID_PLACEMENTS.map((p, i) => makeStructure(200 + i, p.kind, p.x, p.z)),
 ];

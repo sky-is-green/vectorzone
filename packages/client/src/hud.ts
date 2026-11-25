@@ -23,6 +23,11 @@ export interface HudState {
   secondsLeft: number;
   palette: Palette;
   alive: boolean;
+  status: { core: number; tread: number; gun: number; engine: number };
+  killfeed: { text: string; born: number }[];
+  hitFlash: { angle: number; born: number } | null;
+  elevation: number;
+  now: number;
 }
 
 const RADAR_R = 38;
@@ -184,6 +189,56 @@ export function createHud(): {
       ctx.beginPath();
       ctx.arc(rx, ry, 15, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * s.cooldownFrac);
       ctx.stroke();
+      // elevation tick: slides with gun pitch
+      const ey = ry - s.elevation * 40;
+      ctx.strokeStyle = P.worldCss + '88';
+      ctx.beginPath();
+      ctx.moveTo(rx - 6, ey);
+      ctx.lineTo(rx + 6, ey);
+      ctx.stroke();
+    }
+
+    // blocky status readout (bottom-left): damage you can read
+    const rows: [string, number][] = [
+      ['CORE', s.status.core],
+      ['TRD', s.status.tread],
+      ['GUN', s.status.gun],
+      ['ENG', s.status.engine],
+    ];
+    ctx.font = '10px monospace';
+    rows.forEach(([label, n], i) => {
+      const y = h - 64 + i * 14;
+      ctx.fillStyle = hud + 'cc';
+      ctx.fillText(label, 12, y + 4);
+      ctx.fillStyle = P.worldCss + 'cc';
+      for (let k = 0; k < Math.min(n, 12); k++) ctx.fillRect(44 + k * 7, y - 3, 5, 5);
+    });
+
+    // killfeed (bottom-right), 6 s fade
+    ctx.font = '11px monospace';
+    ctx.textAlign = 'right';
+    s.killfeed.slice(-4).forEach((k, i) => {
+      const age = s.now - k.born;
+      const a = Math.max(0, 1 - age / 6000);
+      ctx.fillStyle = hud + Math.floor(a * 220).toString(16).padStart(2, '0');
+      ctx.fillText(k.text, w - 12, h - 60 + i * 14);
+    });
+    ctx.textAlign = 'left';
+
+    // directional hit flash: arrow at the screen edge toward the damage
+    if (s.hitFlash && s.now - s.hitFlash.born < 450) {
+      const a = s.hitFlash.angle;
+      const fade = 1 - (s.now - s.hitFlash.born) / 450;
+      const R = Math.min(w, h) / 2 - 40;
+      const px = w / 2 + Math.sin(a) * R;
+      const py = h / 2 - Math.cos(a) * R;
+      ctx.fillStyle = hud + Math.floor(fade * 255).toString(16).padStart(2, '0');
+      ctx.beginPath();
+      ctx.moveTo(px + Math.sin(a) * 12, py - Math.cos(a) * 12);
+      ctx.lineTo(px + Math.sin(a + 2.5) * 8, py - Math.cos(a + 2.5) * 8);
+      ctx.lineTo(px + Math.sin(a - 2.5) * 8, py - Math.cos(a - 2.5) * 8);
+      ctx.closePath();
+      ctx.fill();
     }
   }
 

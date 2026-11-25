@@ -108,3 +108,4 @@ export { createEnemyTank } from './tank';
 export { traceShot } from './awareness';
 export { MATCH_TICKS, VOLCANO_FINAL_TICKS, BOMB_DROP_TICKS } from './combat';
 export { createVolcano, stepVolcano, type Volcano, type LavaPool } from './volcano';
+export { CLASSIC_FENCES, fenceAlive, fenceHitT, fencePush, type Fence } from './fence';

@@ -13,6 +13,8 @@ import {
   traceShot,
   turretForward,
   turretToWorld,
+  fenceAlive,
+  countType,
   MATCH_TICKS,
   SHELL_COOLDOWN,
   type SimEvent,
@@ -113,6 +115,8 @@ rubbleLines.frustumCulled = false;
 scene.add(rubbleMesh, rubbleLines);
 let rubbleRev = -1;
 const chunkGroups = new Map<number, THREE.LineSegments>();
+const fenceGroups = new Map<number, THREE.LineSegments>();
+const fenceMat = new THREE.LineBasicMaterial({ color: 0x39ff6b, transparent: true, opacity: 0.6 });
 
 // --- M5: enemy tanks, missiles, bomber, telegraphs, AI debug overlay --------
 const enemyBodies = new Map<number, { hull: Body; turret: Body }>();
@@ -149,6 +153,8 @@ scene.add(trajLines);
 const hud = createHud();
 let lastBombBlip = -1e9;
 let matchReported = false;
+const killfeed: { text: string; born: number }[] = [];
+let hitFlash: { angle: number; born: number } | null = null;
 
 // local leaderboard + results screen (5g)
 const SCORES_KEY = 'vectorzone-scores';
@@ -538,6 +544,35 @@ function frame(now: number): void {
       );
     }
   }
+  // energy fence curtains: shimmering vertical dashes between live pylons
+  for (const f of world.fences) {
+    const alive = fenceAlive(world, f);
+    let g = fenceGroups.get(f.id);
+    if (alive && !g) {
+      const p: number[] = [];
+      const len = Math.hypot(f.bx - f.ax, f.bz - f.az);
+      const n = Math.max(2, Math.floor(len / 0.6));
+      for (let i = 0; i <= n; i++) {
+        const u = i / n;
+        const x = f.ax + (f.bx - f.ax) * u;
+        const z = f.az + (f.bz - f.az) * u;
+        p.push(x, 0, z, x, f.height, z);
+      }
+      p.push(f.ax, f.height, f.az, f.bx, f.height, f.bz);
+      p.push(f.ax, 0.05, f.az, f.bx, 0.05, f.bz);
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(p, 3));
+      g = new THREE.LineSegments(geo, fenceMat);
+      fenceGroups.set(f.id, g);
+      scene.add(g);
+    } else if (!alive && g) {
+      scene.remove(g);
+      g.geometry.dispose();
+      fenceGroups.delete(f.id);
+    }
+  }
+  fenceMat.opacity = 0.45 + 0.25 * Math.sin(now / 180);
+
   // lava pools pulse hazard-orange while they burn
   for (const pool of world.lavaPools) {
     const pulse = 0.5 + 0.5 * Math.sin(now / 120);
@@ -587,7 +622,24 @@ function frame(now: number): void {
     else if (ev.kind === 'volcanoErupt') hud.alert('ERUPTION');
     else if (ev.kind === 'matchEnd') hud.alert('MATCH COMPLETE');
     else if (ev.kind === 'kill' && ev.what === 'bomber') hud.alert('BOMBER DOWN');
+    else if (ev.kind === 'scanPing') hud.alert('SCAN PING');
     else if (ev.kind === 'bombTelegraph') lastBombBlip = now;
+    // killfeed + directional hit flash
+    if (ev.kind === 'tankKilled') {
+      if (ev.id === 0) {
+        killfeed.push({ text: ev.by === null ? 'THE ZONE KILLED YOU' : 'ENEMY KILLED YOU', born: now });
+      } else if (ev.by === 0) {
+        killfeed.push({ text: `YOU KILLED ${world.brains.get(ev.id)?.kind === 'super' ? 'SUPERTANK' : 'TANK'}`, born: now });
+      }
+    } else if (ev.kind === 'kill' && ev.by === 0) {
+      killfeed.push({ text: ev.what === 'bomber' ? 'YOU DOWNED BOMBER' : 'YOU DOWNED MISSILE', born: now });
+    }
+    if (ev.kind === 'blockDestroyed' && ev.by !== 0 && Math.hypot(ev.pos[0] - tank.x, ev.pos[2] - tank.z) < 4) {
+      hitFlash = { angle: Math.atan2(ev.pos[0] - tank.x, ev.pos[2] - tank.z) - tank.heading, born: now };
+    }
+    if (ev.kind === 'explosion' && Math.hypot(ev.pos[0] - tank.x, ev.pos[2] - tank.z) < 6) {
+      hitFlash = { angle: Math.atan2(ev.pos[0] - tank.x, ev.pos[2] - tank.z) - tank.heading, born: now };
+    }
     if (ev.kind === 'fire') {
       for (let i = 0; i < 8; i++) {
         smoke.spawn(
@@ -710,6 +762,16 @@ function frame(now: number): void {
     secondsLeft: Math.max(0, (MATCH_TICKS - world.tick) / 60),
     palette: PALETTES[settings.palette % PALETTES.length],
     alive: tank.alive,
+    status: {
+      core: countType(tank.hull, 'core'),
+      tread: countType(tank.hull, 'tread'),
+      gun: countType(tank.turret, 'gun'),
+      engine: countType(tank.hull, 'engine'),
+    },
+    killfeed,
+    hitFlash,
+    elevation: tank.gunPitch,
+    now,
   });
 
   frames++;
