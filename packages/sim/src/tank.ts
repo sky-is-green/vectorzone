@@ -53,6 +53,7 @@ export interface Tank {
   turretPivot: { x: number; y: number; z: number };
   alive: boolean;
   cooldown: number; // s until next shot
+  spawnTick: number; // for spawn grace
 }
 
 /**
@@ -88,7 +89,7 @@ export const PLAYER_TURRET_LAYERS: string[][] = [
 ];
 
 export const GUN_PITCH_MIN = -0.09; // ~ -5°
-export const GUN_PITCH_MAX = 0.61; // ~ +35°
+export const GUN_PITCH_MAX = 1.05; // ~ +60° (anti-air: the bomber must be shootable)
 const GUN_PITCH_RATE = 1.4; // rad/s
 
 const clamp = (v: number, lo: number, hi: number): number =>
@@ -128,6 +129,69 @@ export function createTank(id: number, x: number, z: number, heading: number): T
     turretPivot: { x: 0, y: hull.size.y * BLOCK_SIZE, z: 0.3 },
     alive: true,
     cooldown: 0,
+    spawnTick: 0,
+  };
+}
+
+/** Enemy hulls: slower tank is smaller; supertank doubles its treads. */
+const SLOW_HULL: string[][] = [
+  [
+    'THHHHT', 'THHHHT', 'THHHHT', 'THHHHT', 'THHHHT',
+    'THHHHT', 'THHHHT', 'THHHHT', 'THHHHT', 'THHHHT',
+  ],
+  [
+    'HHHHHH', 'HHHHHH', 'HHHHHH', 'HHHHHH', 'HHHHHH',
+    'HHHHHH', 'HHHHHH', 'HHHHHH', 'HHEEHH', 'HHEEHH',
+  ],
+  [
+    '......', 'HHHHHH', 'HHHHHH', 'HHHHHH', 'HHCCHH',
+    'HHCCHH', 'HHHHHH', 'HHHHHH', 'HHHHHH', '......',
+  ],
+];
+
+const SLOW_TURRET: string[][] = [
+  ['.G.', 'HGH', 'HHH', 'HHH'],
+  ['...', '...', '.H.', '.H.'],
+];
+
+const SUPER_HULL: string[][] = PLAYER_HULL_LAYERS.map((layer, y) =>
+  y === 0 ? layer.map(() => 'TTHHHHTT') : layer,
+);
+
+const SUPER_TURRET: string[][] = [
+  ['.GG.', '.GG.', '.GG.', 'HGGH', 'HHHH', 'HHHH', 'HHHH'],
+  ['....', '....', '....', '.HH.', '.HH.', '.HH.', '.HH.'],
+];
+
+export function createEnemyTank(
+  id: number,
+  kind: 'slow' | 'super',
+  x: number,
+  z: number,
+  heading: number,
+): Tank {
+  const hull = parseLayout(kind === 'slow' ? SLOW_HULL : SUPER_HULL);
+  const turret = parseLayout(kind === 'slow' ? SLOW_TURRET : SUPER_TURRET);
+  const stats = computeStats(hull, turret);
+  const mul = kind === 'slow' ? 0.5 : 1.2;
+  stats.topSpeed *= mul;
+  stats.accel = stats.topSpeed / 2.5;
+  stats.turretSlew = kind === 'slow' ? 0.785 : 2.094;
+  return {
+    id,
+    hull,
+    turret,
+    x,
+    z,
+    heading,
+    speed: 0,
+    turretYaw: 0,
+    gunPitch: 0,
+    stats,
+    turretPivot: { x: 0, y: hull.size.y * BLOCK_SIZE, z: 0.3 },
+    alive: true,
+    cooldown: 0,
+    spawnTick: 0,
   };
 }
 

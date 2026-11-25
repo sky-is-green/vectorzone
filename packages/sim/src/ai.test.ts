@@ -1,0 +1,153 @@
+import { describe, expect, it } from 'vitest';
+import { createWorld, stepWorld, hashWorld } from './world';
+import { createEnemyTank, type TankCommand } from './tank';
+import { createBrain, thinkBrain, AI_KNOBS } from './ai';
+import { stepAwareness } from './awareness';
+import { makeStructure } from './structure';
+import { BOMBER_PERIOD, TELEGRAPH_TICKS } from './director';
+
+const N: TankCommand = { throttle: 0, turn: 0, turretYaw: 0, gunPitch: 0, fire: false };
+
+function duel(dist: number, kind: 'slow' | 'super' = 'slow') {
+  const w = createWorld(5);
+  const e = createEnemyTank(1, kind, 0, dist, Math.PI);
+  e.spawnTick = -1000;
+  w.tanks.push(e);
+  w.brains.set(1, createBrain(kind));
+  w.tanks[0].spawnTick = -1000;
+  w.nextSpawnTick = 1e9; // director idle: test the brain alone
+  w.nextBomberTick = 1e9;
+  return w;
+}
+
+describe('AI imperfection (AI.md)', () => {
+  it('no contacts → no omniscient hunting (commands neutral)', () => {
+    const w = duel(60);
+    w.awareness.clear();
+    const cmd = thinkBrain(w, w.brains.get(1)!, w.tanks[1]);
+    expect(cmd.fire).toBe(false);
+    expect(cmd.throttle).toBe(0);
+  });
+
+  it('engages a known contact: fires with cooldown discipline and nonzero error', () => {
+    const w = duel(70);
+    let shots = 0;
+    let errs: number[] = [];
+    for (let i = 0; i < 1200; i++) {
+      stepWorld(w, [N]);
+      for (const ev of w.events) {
+        if (ev.kind === 'fire' && ev.owner === 1) shots++;
+      }
+      const b = w.brains.get(1)!;
+      if (b.debug.err > 0) errs.push(b.debug.err);
+    }
+    expect(shots).toBeGreaterThan(0);
+    expect(shots).toBeLessThan(1200 / (AI_KNOBS.slow.cooldown[0] * 60) + 2);
+    expect(errs.some((e) => e > 0)).toBe(true);
+  });
+
+  it('blocked LOS: slow tank repositions, supertank shoots through cover', () => {
+    // think-level isolation: no movement, so the block persists
+    const ws = duel(70, 'slow');
+    ws.structures.push(makeWall());
+    stepAwareness(ws);
+    const bs = ws.brains.get(1)!;
+    for (let i = 0; i < 40; i++) {
+      ws.tick += 24;
+      ws.events = [];
+      ws.awareness.set(1, new Map([[0, { x: 0, z: 0, heading: 0, tick: ws.tick, source: 'ping' }]]));
+      thinkBrain(ws, bs, ws.tanks[1]);
+    }
+    expect(bs.mode).toBe('reposition');
+
+    const wu = duel(70, 'super');
+    wu.structures.push(makeWall());
+    stepAwareness(wu);
+    const bu = wu.brains.get(1)!;
+    let superShots = 0;
+    for (let i = 0; i < 40; i++) {
+      wu.tick += 15;
+      wu.events = [];
+      wu.awareness.set(1, new Map([[0, { x: 0, z: 0, heading: 0, tick: wu.tick, source: 'ping' }]]));
+      const cmd = thinkBrain(wu, bu, wu.tanks[1]);
+      if (cmd.fire) superShots++;
+      wu.tanks[1].cooldown = 0; // isolate policy from cooldown discipline
+    }
+    expect(superShots).toBeGreaterThan(0);
+  });
+
+  it('determinism: same seed + same script → identical hash with AI active', () => {
+    const run = () => {
+      const w = duel(80);
+      for (let i = 0; i < 1500; i++) stepWorld(w, [i % 200 < 100 ? { ...N, throttle: 1 } : N]);
+      return hashWorld(w);
+    };
+    expect(run()).toBe(run());
+  });
+});
+
+function makeWall() {
+  // tower between the duelists at z=35: 2.4 m tall, blocks eye-level (1.2 m) LOS
+  return makeStructure(600, 'tower', 0, 35);
+}
+
+describe('bomber (AI.md §5.4)', () => {
+  it('spawns on cadence, flies straight, telegraphs bombs >= 1.5 s before impact', () => {
+    const w = createWorld(9);
+    w.nextBomberTick = 10;
+    w.nextSpawnTick = 1e9;
+    for (let i = 0; i < 12; i++) stepWorld(w, [N]);
+    const b = w.bomber!;
+    expect(b).toBeTruthy();
+    const dir0 = [...b.dir];
+    // put the player under its path
+    w.tanks[0].x = b.pos[0] + b.dir[0] * 40;
+    w.tanks[0].z = b.pos[2] + b.dir[2] * 40;
+    let telegraphAt = -1;
+    let explosionAt = -1;
+    for (let i = 0; i < 600; i++) {
+      stepWorld(w, [N]);
+      if (telegraphAt < 0 && w.events.some((e) => e.kind === 'bombTelegraph')) telegraphAt = w.tick;
+      if (telegraphAt >= 0 && explosionAt < 0 && w.events.some((e) => e.kind === 'explosion')) explosionAt = w.tick;
+      expect(b.dir[0]).toBeCloseTo(dir0[0], 9); // straight line
+      expect(b.dir[2]).toBeCloseTo(dir0[2], 9);
+    }
+    expect(telegraphAt).toBeGreaterThan(0);
+    expect(explosionAt - telegraphAt).toBeGreaterThanOrEqual(TELEGRAPH_TICKS);
+  });
+
+  it('shooting the bomber kills it and reveals the shooter (gunfire rule)', () => {
+    const w = createWorld(9);
+    w.nextBomberTick = 10;
+    w.nextSpawnTick = 1e9;
+    for (let i = 0; i < 12; i++) stepWorld(w, [N]);
+    const b = w.bomber!;
+    // hold the bomber where a max-elevation shot can reach it (15 m up,
+    // ~8.6 m ahead along the gun axis at 60°)
+    const t = w.tanks[0];
+    t.gunPitch = 1.05;
+    let killed = false;
+    for (let i = 0; i < 400 && !killed; i++) {
+      b.pos[0] = t.x + Math.sin(t.heading) * 8.6;
+      b.pos[2] = t.z + Math.cos(t.heading) * 8.6;
+      b.pos[1] = 15;
+      stepWorld(w, [{ ...N, fire: true }]);
+      killed = w.events.some((e) => e.kind === 'kill' && e.what === 'bomber');
+    }
+    expect(killed).toBe(true);
+    expect(w.score).toBeGreaterThanOrEqual(1000);
+  });
+
+  it('cadence: next bomber one period after the previous', () => {
+    const w = createWorld(9);
+    w.nextBomberTick = 10;
+    w.nextSpawnTick = 1e9;
+    let spawnAt = -1;
+    for (let i = 0; i < 20; i++) {
+      stepWorld(w, [N]);
+      if (spawnAt < 0 && w.bomber) spawnAt = w.tick;
+    }
+    expect(spawnAt).toBeGreaterThan(0);
+    expect(w.nextBomberTick).toBe(spawnAt + BOMBER_PERIOD);
+  });
+});

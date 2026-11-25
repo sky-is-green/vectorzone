@@ -75,3 +75,34 @@ export {
   type StructureKind,
   type AnchorKind,
 } from './structure';
+export {
+  PROXIMITY,
+  SIGHT_RANGE,
+  MEMORY_TICKS,
+  GUNFIRE_TICKS,
+  PING_TICKS,
+  GRACE_TICKS,
+  hasLos,
+  targetable,
+  stepAwareness,
+  type Known,
+  type ContactSource,
+} from './awareness';
+export {
+  AI_KNOBS,
+  createBrain,
+  thinkBrain,
+  type AiBrain,
+  type AiKind,
+  type AiKnobs,
+} from './ai';
+export {
+  SCORE_VALUES,
+  BOMBER_PERIOD,
+  TELEGRAPH_TICKS,
+  stepDirector,
+  type Missile,
+  type Bomber,
+  type Telegraph,
+} from './director';
+export { createEnemyTank } from './tank';

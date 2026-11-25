@@ -34,6 +34,9 @@ import {
   type Shell,
   type SimEvent,
 } from './combat';
+import { stepAwareness, type Known } from './awareness';
+import { thinkBrain, AI_KNOBS, type AiBrain } from './ai';
+import { BOMBER_PERIOD, SCORE_VALUES, stepDirector, type Bomber, type Missile, type Telegraph } from './director';
 
 export interface RubbleCell {
   x: number;
@@ -67,6 +70,21 @@ export interface World {
   events: SimEvent[];
   pendingExplosions: V3[];
   nextId: number;
+  // M5: awareness, AI, director, solo loop
+  awareness: Map<number, Map<number, Known>>;
+  brains: Map<number, AiBrain>;
+  missiles: Missile[];
+  bomber: Bomber | null;
+  telegraphs: Telegraph[];
+  stormUntil: number;
+  score: number;
+  lives: number;
+  phase: 'play' | 'over';
+  nextSpawnTick: number;
+  nextBomberTick: number;
+  respawnTick: number;
+  nextLifeAt: number;
+  lastHitBy: Map<number, number | null>;
 }
 
 export const TICK_RATE = 60;
@@ -89,6 +107,20 @@ export function createWorld(seed: number): World {
     events: [],
     pendingExplosions: [],
     nextId: 1,
+    awareness: new Map(),
+    brains: new Map(),
+    missiles: [],
+    bomber: null,
+    telegraphs: [],
+    stormUntil: 0,
+    score: 0,
+    lives: 3,
+    phase: 'play',
+    nextSpawnTick: 300,
+    nextBomberTick: BOMBER_PERIOD,
+    respawnTick: 0,
+    nextLifeAt: 10000,
+    lastHitBy: new Map(),
   };
 }
 
@@ -132,13 +164,13 @@ const dist = (a: V3, b: V3): number => Math.hypot(a[0] - b[0], a[1] - b[1], a[2]
 
 type Damaged = Map<BlockGrid, GridCtx>;
 
-function destroyCell(w: World, ctx: GridCtx, c: V3, damaged: Damaged): void {
+function destroyCell(w: World, ctx: GridCtx, c: V3, damaged: Damaged, by: number | null): void {
   const b = getCell(ctx.g, c[0], c[1], c[2]);
   if (!b) return;
   const wp = cellWorld(ctx, c);
   setCell(ctx.g, c[0], c[1], c[2], null);
   damaged.set(ctx.g, ctx);
-  w.events.push({ kind: 'blockDestroyed', pos: wp });
+  w.events.push({ kind: 'blockDestroyed', pos: wp, by });
   if (b.type === 'ammo') w.pendingExplosions.push(wp);
   for (const n of [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]] as V3[]) {
     const nc: V3 = [c[0] + n[0], c[1] + n[1], c[2] + n[2]];
@@ -146,16 +178,16 @@ function destroyCell(w: World, ctx: GridCtx, c: V3, damaged: Damaged): void {
     if (!nb) continue;
     nb.hp -= SPLASH_DAMAGE;
     damaged.set(ctx.g, ctx);
-    if (nb.hp <= 0) destroyCell(w, ctx, nc, damaged);
+    if (nb.hp <= 0) destroyCell(w, ctx, nc, damaged, by);
   }
 }
 
-function damageCell(w: World, ctx: GridCtx, c: V3, dmg: number, damaged: Damaged): void {
+function damageCell(w: World, ctx: GridCtx, c: V3, dmg: number, damaged: Damaged, by: number | null): void {
   const b = getCell(ctx.g, c[0], c[1], c[2]);
   if (!b) return;
   b.hp -= dmg;
   damaged.set(ctx.g, ctx);
-  if (b.hp <= 0) destroyCell(w, ctx, c, damaged);
+  if (b.hp <= 0) destroyCell(w, ctx, c, damaged, by);
 }
 
 // --- shells ----------------------------------------------------------------
@@ -186,17 +218,17 @@ function stepShells(w: World, damaged: Damaged): void {
       const b = getCell(cand.ctx.g, cand.cell[0], cand.cell[1], cand.cell[2]);
       if (!b) continue; // already destroyed earlier along this segment
       const wp = cellWorld(cand.ctx, cand.cell);
+      if (cand.ctx.tank) w.lastHitBy.set(cand.ctx.tank.id, sh.owner);
       const cost = PEN_COST[b.type];
       if (sh.budget < cost) {
-        damageCell(w, cand.ctx, cand.cell, 1, damaged);
+        damageCell(w, cand.ctx, cand.cell, 1, damaged, sh.owner);
         sh.alive = false;
         w.events.push({ kind: 'shellImpact', pos: wp });
         break;
       }
       sh.budget -= cost;
-      // paying the penetration cost destroys the entered cell — that is what
-      // makes a budgeted side hit a clean tunnel (blow-through)
-      destroyCell(w, cand.ctx, cand.cell, damaged);
+      // paying the penetration cost destroys the entered cell — blow-through
+      destroyCell(w, cand.ctx, cand.cell, damaged, sh.owner);
     }
     if (!sh.alive) continue;
     sh.pos = add(sh.pos, mul(sh.dir, step));
@@ -222,7 +254,7 @@ function stepExplosions(w: World, damaged: Damaged): void {
             if (!getCell(ctx.g, x, y, z)) continue;
             const c: V3 = [x, y, z];
             if (dist(cellWorld(ctx, c), pos) <= EXPLOSION_RADIUS) {
-              damageCell(w, ctx, c, EXPLOSION_DAMAGE, damaged);
+              damageCell(w, ctx, c, EXPLOSION_DAMAGE, damaged, null);
             }
           }
         }
@@ -279,7 +311,16 @@ function stepIntegrity(w: World, damaged: Damaged): void {
       spawnChunk(w, ctx, detachDisconnected(g, []), types);
       if (ctx.tank && ctx.part === 'hull') {
         ctx.tank.alive = false;
-        w.events.push({ kind: 'tankKilled', id: ctx.tank.id, pos: [ctx.tank.x, 1, ctx.tank.z] });
+        const by = w.lastHitBy.get(ctx.tank.id) ?? null;
+        w.events.push({ kind: 'tankKilled', id: ctx.tank.id, pos: [ctx.tank.x, 1, ctx.tank.z], by });
+        if (ctx.tank.id === 0) {
+          w.lives--;
+          if (w.lives <= 0) w.phase = 'over';
+          else w.respawnTick = w.tick + 180;
+        } else if (by === 0) {
+          const brain = w.brains.get(ctx.tank.id);
+          w.score += brain?.kind === 'super' ? SCORE_VALUES.super : SCORE_VALUES.slow;
+        }
         const tctx = ctxs.find((c) => c.tank === ctx.tank && c.part === 'turret');
         if (tctx && !processed.has(tctx.g)) {
           processed.add(tctx.g);
@@ -325,29 +366,51 @@ export function stepWorld(w: World, commands: TankCommand[] = []): void {
   w.tick += 1;
   const damaged: Damaged = new Map();
 
+  // solo respawn after the 3 s deathcam
+  if (w.phase === 'play' && !w.tanks[0].alive && w.respawnTick > 0 && w.tick >= w.respawnTick) {
+    const a = w.rng.next() * Math.PI * 2;
+    const fresh = createTank(0, Math.sin(a) * 120, Math.cos(a) * 120, w.rng.next() * Math.PI * 2);
+    fresh.spawnTick = w.tick;
+    w.tanks[0] = fresh;
+    w.respawnTick = 0;
+  }
+
   for (let i = 0; i < w.tanks.length; i++) {
     const t = w.tanks[i];
     if (!t.alive) continue;
-    const cmd = commands[i] ?? neutralCommand();
+    const brain = w.brains.get(t.id);
+    const cmd = i === 0 ? (commands[0] ?? neutralCommand()) : brain ? thinkBrain(w, brain, t) : neutralCommand();
     stepTank(t, cmd, TICK_DT, w.arenaHalf, w.obstacles);
     t.cooldown = Math.max(0, t.cooldown - TICK_DT);
     if (cmd.fire && t.cooldown === 0 && anchorCells(t.turret, 'turret').length > 0) {
       const dir = turretForward(t);
-      const muzzle = turretToWorld(t, [
-        0,
-        BLOCK_SIZE,
-        (t.turret.size.z / 2) * BLOCK_SIZE + 0.15,
-      ]);
+      const muzzle = turretToWorld(t, [0, BLOCK_SIZE, (t.turret.size.z / 2) * BLOCK_SIZE + 0.15]);
       w.shells.push({ id: w.nextId++, owner: t.id, pos: muzzle, dir, budget: SHELL_BUDGET, alive: true });
-      t.cooldown = SHELL_COOLDOWN;
-      w.events.push({ kind: 'fire', pos: muzzle, dir });
+      const brainK = w.brains.get(t.id)?.kind;
+      const cd = brainK ? AI_KNOBS[brainK].cooldown : null;
+      t.cooldown = cd ? cd[0] + w.rng.next() * (cd[1] - cd[0]) : SHELL_COOLDOWN;
+      w.events.push({ kind: 'fire', pos: muzzle, dir, owner: t.id });
     }
   }
 
   stepShells(w, damaged);
+  stepDirector(w);
   stepExplosions(w, damaged);
   stepIntegrity(w, damaged);
   stepChunks(w);
+  stepAwareness(w);
+
+  // scoring from events (player kills/credits only)
+  for (const ev of w.events) {
+    if (ev.kind === 'blockDestroyed' && ev.by === 0) w.score += SCORE_VALUES.block;
+    else if (ev.kind === 'kill' && ev.by === 0) {
+      w.score += ev.what === 'bomber' ? SCORE_VALUES.bomber : SCORE_VALUES.missile;
+    }
+  }
+  while (w.score >= w.nextLifeAt) {
+    w.lives++;
+    w.nextLifeAt += 10000;
+  }
   while (w.rubble.length > RUBBLE_CAP) {
     w.rubble.shift();
     w.rubbleRev++;
@@ -356,7 +419,7 @@ export function stepWorld(w: World, commands: TankCommand[] = []): void {
 
 /** Stable hash of world state — the determinism gate compares these. */
 export function hashWorld(w: World): string {
-  const parts: string[] = [`${w.seed}|${w.tick}|${w.rng.state()}`];
+  const parts: string[] = [`${w.seed}|${w.tick}|${w.rng.state()}|${w.score}|${w.lives}|${w.phase}`];
   for (const t of w.tanks) {
     parts.push(
       [t.id, t.x, t.z, t.heading, t.speed, t.turretYaw, t.gunPitch, t.hull.rev, t.turret.rev, t.alive ? 1 : 0]
@@ -365,7 +428,22 @@ export function hashWorld(w: World): string {
     );
   }
   for (const s of w.structures) parts.push(`${s.id}:${s.grid.rev}`);
-  parts.push(`rub${w.rubble.length}:${w.rubbleRev}`, `chk${w.chunks.length}`, `shl${w.shells.length}`);
+  for (const [oid, m] of [...w.awareness.entries()].sort((a, b) => a[0] - b[0])) {
+    for (const [tid, k] of [...m.entries()].sort((a, b) => a[0] - b[0])) {
+      parts.push(`a${oid}:${tid}:${k.tick}:${k.source}`);
+    }
+  }
+  for (const [id, b] of [...w.brains.entries()].sort((a, b) => a[0] - b[0])) {
+    parts.push(`b${id}:${b.mode}:${b.targetId}:${b.shotsAtContact}`);
+  }
+  parts.push(
+    `rub${w.rubble.length}:${w.rubbleRev}`,
+    `chk${w.chunks.length}`,
+    `shl${w.shells.length}`,
+    `mis${w.missiles.length}`,
+    `bmb${w.bomber ? 1 : 0}`,
+    `tel${w.telegraphs.length}`,
+  );
   const s = parts.join(';');
   let h = 0x811c9dc5;
   for (let i = 0; i < s.length; i++) {

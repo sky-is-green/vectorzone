@@ -34,10 +34,14 @@ export interface Shell {
 }
 
 export type SimEvent =
-  | { kind: 'fire'; pos: V3; dir: V3 }
+  | { kind: 'fire'; pos: V3; dir: V3; owner: number }
   | { kind: 'shellImpact'; pos: V3 }
-  | { kind: 'blockDestroyed'; pos: V3 }
+  | { kind: 'blockDestroyed'; pos: V3; by: number | null }
   | { kind: 'explosion'; pos: V3; radius: number }
   | { kind: 'chunkDetached'; id: number }
-  | { kind: 'tankKilled'; id: number; pos: V3 }
+  | { kind: 'tankKilled'; id: number; pos: V3; by: number | null }
+  | { kind: 'kill'; id: number; what: 'missile' | 'bomber'; by: number | null }
+  | { kind: 'scanPing' }
+  | { kind: 'bomberInbound'; pos: V3 }
+  | { kind: 'bombTelegraph'; pos: V3 }
   | { kind: 'rubbleChanged' };

@@ -21,6 +21,8 @@ const PHOSPHOR = 0x39ff6b;
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
+// composer renders many passes per frame; accumulate stats across all of them
+renderer.info.autoReset = false;
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
@@ -41,7 +43,7 @@ const edgeMat = new THREE.LineBasicMaterial({ color: PHOSPHOR });
 
 // --- sim + tank visuals ----------------------------------------------------
 const world = createWorld(0xb477e2);
-const tank = world.tanks[0];
+let tank = world.tanks[0];
 
 interface Body {
   group: THREE.Group;
@@ -92,9 +94,57 @@ const rubbleMat = new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.Dou
 const rubbleEdgeMat = new THREE.LineBasicMaterial({ color: 0x1d7a3a });
 let rubbleMesh = new THREE.Mesh(new THREE.BufferGeometry(), rubbleMat);
 let rubbleLines = new THREE.LineSegments(new THREE.BufferGeometry(), rubbleEdgeMat);
+// empty initial geometry has a NaN bounding sphere; never cull these
+rubbleMesh.frustumCulled = false;
+rubbleLines.frustumCulled = false;
 scene.add(rubbleMesh, rubbleLines);
 let rubbleRev = -1;
 const chunkGroups = new Map<number, THREE.LineSegments>();
+
+// --- M5: enemy tanks, missiles, bomber, telegraphs, AI debug overlay --------
+const enemyBodies = new Map<number, { hull: Body; turret: Body }>();
+const missileGroups = new Map<number, THREE.LineSegments>();
+let bomberGroup: THREE.LineSegments | null = null;
+let debugAi = false;
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'KeyX') debugAi = !debugAi;
+});
+const debugGeo = new THREE.BufferGeometry();
+const debugPos = new Float32Array(4096);
+debugGeo.setAttribute(
+  'position',
+  new THREE.BufferAttribute(debugPos, 3).setUsage(THREE.DynamicDrawUsage),
+);
+debugGeo.setDrawRange(0, 0);
+const debugLines = new THREE.LineSegments(
+  debugGeo,
+  new THREE.LineBasicMaterial({ color: 0xff4433, transparent: true, opacity: 0.7 }),
+);
+debugLines.frustumCulled = false;
+debugLines.visible = false;
+scene.add(debugLines);
+
+function crossGeometry(size: number): THREE.BufferGeometry {
+  const s = size;
+  const p = [-s, 0, 0, s, 0, 0, 0, 0, -s, 0, 0, s, 0, -s, 0, 0, s, 0];
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3));
+  return g;
+}
+
+function bomberGeometry(): THREE.BufferGeometry {
+  const p: number[] = [];
+  const S = 12;
+  for (let i = 0; i < S; i++) {
+    const a = (i / S) * Math.PI * 2;
+    const b = ((i + 1) / S) * Math.PI * 2;
+    p.push(Math.sin(a) * 3, 0, Math.cos(a) * 3, Math.sin(b) * 3, 0, Math.cos(b) * 3);
+    p.push(0, 0.8, 0, Math.sin(a) * 1.4, 0.8, Math.cos(a) * 1.4);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3));
+  return g;
+}
 
 // Rigid gun mount (F1 fix): the camera is the turret transform composed with
 // a fixed local offset — exactly as if parented to the gun. It swings with
@@ -200,6 +250,7 @@ const debug: { cam: { p: [number, number, number]; l: [number, number, number] }
     return rebuilds;
   },
   post,
+  scene,
   // numeric visual verification: render scene (or post chain) into a small
   // target and return lit-pixel count + mean color + row variance
   sample: (usePost: boolean) => {
@@ -272,6 +323,7 @@ function frame(now: number): void {
     evQueue.push(...world.events);
     accumulator -= TICK_DT;
   }
+  tank = world.tanks[0];
 
   refreshBody(hull, tank.hull);
   refreshBody(turret, tank.turret);
@@ -334,6 +386,102 @@ function frame(now: number): void {
       sh.dir[0] * 60, sh.dir[1] * 60, sh.dir[2] * 60,
       0.06, tint.tracer[0], tint.tracer[1], tint.tracer[2], 2.5,
     );
+  }
+
+  // --- M5 sync: enemies, missiles, bomber, telegraph rings ------------------
+  for (const t of world.tanks) {
+    if (t.id === 0) continue;
+    let eb = enemyBodies.get(t.id);
+    if (!eb) {
+      eb = { hull: makeBody(t.hull), turret: makeBody(t.turret) };
+      eb.turret.group.position.set(t.turretPivot.x, t.turretPivot.y, t.turretPivot.z);
+      eb.turret.group.rotation.order = 'YXZ';
+      eb.hull.group.add(eb.turret.group);
+      scene.add(eb.hull.group);
+      enemyBodies.set(t.id, eb);
+    }
+    refreshBody(eb.hull, t.hull);
+    refreshBody(eb.turret, t.turret);
+    eb.hull.group.visible = t.alive;
+    eb.hull.group.position.set(t.x, 0, t.z);
+    eb.hull.group.rotation.y = t.heading;
+    eb.turret.group.rotation.y = t.turretYaw;
+    eb.turret.group.rotation.x = -t.gunPitch;
+  }
+  for (const [id, eb] of enemyBodies) {
+    if (!world.tanks.some((t) => t.id === id)) {
+      scene.remove(eb.hull.group);
+      enemyBodies.delete(id);
+    }
+  }
+  for (const m of world.missiles) {
+    let g = missileGroups.get(m.id);
+    if (!g) {
+      g = new THREE.LineSegments(crossGeometry(0.7), edgeMat);
+      missileGroups.set(m.id, g);
+      scene.add(g);
+    }
+    g.position.set(m.pos[0], m.pos[1], m.pos[2]);
+    g.rotation.y = Math.atan2(m.dir[0], m.dir[2]);
+  }
+  for (const [id, g] of missileGroups) {
+    if (!world.missiles.some((m) => m.id === id)) {
+      scene.remove(g);
+      g.geometry.dispose();
+      missileGroups.delete(id);
+    }
+  }
+  if (world.bomber) {
+    if (!bomberGroup) {
+      bomberGroup = new THREE.LineSegments(bomberGeometry(), edgeMat);
+      scene.add(bomberGroup);
+    }
+    bomberGroup.position.set(world.bomber.pos[0], world.bomber.pos[1], world.bomber.pos[2]);
+    bomberGroup.rotation.y = Math.atan2(world.bomber.dir[0], world.bomber.dir[2]);
+  } else if (bomberGroup) {
+    scene.remove(bomberGroup);
+    bomberGroup.geometry.dispose();
+    bomberGroup = null;
+  }
+  // telegraph rings pulse while a bomb is inbound (>= 1.5 s warning)
+  for (const tg of world.telegraphs) {
+    const pulse = 0.5 + 0.5 * Math.sin(now / 90);
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * Math.PI * 2;
+      smoke.spawn(
+        tg.x + Math.sin(a) * tg.radius, 0.05, tg.z + Math.cos(a) * tg.radius,
+        0, 0, 0,
+        0.12, tint.hazard[0] * pulse, tint.hazard[1] * pulse, tint.hazard[2] * pulse, 0.5,
+        Math.cos(a), 0, -Math.sin(a),
+      );
+    }
+  }
+  // AI debug overlay: intent, LOS, aim cone (X toggles)
+  debugLines.visible = debugAi;
+  if (debugAi) {
+    let n = 0;
+    const push = (...v: number[]) => {
+      for (const x of v) debugPos[n++] = x;
+    };
+    for (const t of world.tanks) {
+      const b = world.brains.get(t.id);
+      if (!b || !t.alive) continue;
+      if (b.debug.intent) {
+        push(t.x, 1.4, t.z, b.debug.intent[0], 1.4, b.debug.intent[2]);
+      }
+      if (b.aim) {
+        const yaw = t.heading + t.turretYaw;
+        const e = b.debug.err || 0.05;
+        for (const s of [-1, 1]) {
+          push(
+            t.x, 1.4, t.z,
+            t.x + Math.sin(yaw + e * s) * 20, 1.4, t.z + Math.cos(yaw + e * s) * 20,
+          );
+        }
+      }
+    }
+    debugGeo.setDrawRange(0, n / 3);
+    (debugGeo.attributes.position as THREE.BufferAttribute).needsUpdate = true;
   }
 
   // combat events → particles & scorch rings
@@ -415,6 +563,7 @@ function frame(now: number): void {
       .multiply(Q_HALF_TURN);
   }
 
+  renderer.info.reset();
   post.render(now / 1000);
 
   frames++;
