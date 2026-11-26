@@ -92,7 +92,7 @@ Palette: green phosphor (`#39ff6b`-ish) for the world, red band for HUD (matchin
 
 ### 5.1 The block grid
 
-- A tank is a 3D grid, e.g. **8 wide × 5 tall × 12 long** cells at 0.3 m → ~2.4 × 1.5 × 3.6 m tank.
+- A tank is a 3D grid at 0.3 m per cell. Chosen models: **Light A2** = 11×3×10 (~3.3×0.9×3.0 m), **Super C2** = 13×3×14 (~3.9×0.9×4.2 m).
 - Each cell: `{ type, hp }`. Types:
 
 | Block | Role | Gameplay effect when destroyed |
@@ -118,7 +118,7 @@ Palette: green phosphor (`#39ff6b`-ish) for the world, red band for HUD (matchin
 
 ### 5.3 Tank classes (hand-authored — customization scrapped)
 
-- One canonical player tank; enemy classes (slow tank, supertank) get their own designed layouts.
+- One canonical **Light A2** player/light-tank layout; the supertank uses the chosen **Super C2** siege layout. Both are hand-authored, destructible grids.
 - No editor, no loadouts, no share codes. Every tank is a crafted artifact.
 - Block types still drive everything: layout determines stats, and damage reads the same on every tank.
 

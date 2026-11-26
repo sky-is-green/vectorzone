@@ -27,7 +27,7 @@ describe('penetration & blow-through', () => {
       evs.push(...w.events.map((e) => e.kind));
     }
     for (let x = 0; x < t.hull.size.x; x++) {
-      expect(getCell(t.hull, x, 1, 6)).toBeNull();
+      expect(getCell(t.hull, x, 1, 5)).toBeNull();
     }
     // and out the other side: the ray path is empty end to end
     expect(evs.some((k) => k === 'blockDestroyed')).toBe(true);
@@ -38,18 +38,18 @@ describe('penetration & blow-through', () => {
     const t = w.tanks[0];
     w.shells.push(shell([-3, 0.45, 0], [1, 0, 0], 4)); // 2 cells of hull
     for (let i = 0; i < 6; i++) stepWorld(w);
-    expect(getCell(t.hull, 0, 1, 6)).toBeNull();
-    expect(getCell(t.hull, 1, 1, 6)).toBeNull();
-    expect(getCell(t.hull, 3, 1, 6)).not.toBeNull();
+    expect(getCell(t.hull, 0, 1, 5)).toBeNull();
+    expect(getCell(t.hull, 1, 1, 5)).toBeNull();
+    expect(getCell(t.hull, 3, 1, 5)).not.toBeNull();
   });
 
   it('splash chips neighbours of destroyed cells', () => {
     const w = createWorld(1);
     const t = w.tanks[0];
-    const before = getCell(t.hull, 0, 0, 6)!.hp;
+    const before = getCell(t.hull, 0, 0, 5)!.hp;
     w.shells.push(shell([-3, 0.45, 0], [1, 0, 0], 4));
     for (let i = 0; i < 6; i++) stepWorld(w);
-    const after = getCell(t.hull, 0, 0, 6);
+    const after = getCell(t.hull, 0, 0, 5);
     expect(after === null || after.hp < before).toBe(true);
   });
 });

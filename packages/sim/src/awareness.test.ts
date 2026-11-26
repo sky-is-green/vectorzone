@@ -10,7 +10,7 @@ function twoTanks(dist: number, kind: 'slow' | 'super' = 'slow') {
   const e = createEnemyTank(1, kind, 0, dist, Math.PI);
   e.spawnTick = -1000; // past grace
   w.tanks.push(e);
-  w.brains.set(1, createBrain('slow'));
+  w.brains.set(1, createBrain(kind));
   w.tanks[0].spawnTick = -1000;
   w.nextSpawnTick = 1e9;
   w.nextSuperTick = 1e9;

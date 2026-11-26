@@ -56,35 +56,28 @@ export interface Tank {
 }
 
 /**
- * Canonical player tank (PLAN §5.1): 8 wide × 3 tall × 12 long hull,
- * treads on both flanks, engine at the rear, core mid-deck.
+ * Light A2 — Low Wedge (chosen 2026-11-26). 11×3×10 hull with an open
+ * under-hull, separate track pods, raised central deck, and sharp glacis.
  */
 export const PLAYER_HULL_LAYERS: string[][] = [
-  // y = 0: tread rows + floor
+  // y = 0: track pods only — open space under the hull
+  Array(10).fill('TT.......TT'),
+  // y = 1: hull + tracks, stepped nose
   [
-    'THHHHHHT', 'THHHHHHT', 'THHHHHHT', 'THHHHHHT', 'THHHHHHT', 'THHHHHHT',
-    'THHHHHHT', 'THHHHHHT', 'THHHHHHT', 'THHHHHHT', 'THHHHHHT', 'THHHHHHT',
+    'TTHHEEEHHTT', 'TTHHHHHHHHT', 'TTHHHHHHHHT', 'TTHHHHHHHHT', 'TTHHHHHHHHT',
+    'TTHHHHHHHHT', 'TTHHHHHHHHT', 'TTHHHHHHHHT', 'TT.HHHHH.TT', 'TT..HHH..TT',
   ],
-  // y = 1: body, engine at rear centre
+  // y = 2: raised central deck + core, wedge front
   [
-    'HHHHHHHH', 'HHHHHHHH', 'HHHHHHHH', 'HHHHHHHH', 'HHHHHHHH', 'HHHHHHHH',
-    'HHHHHHHH', 'HHHHHHHH', 'HHHHHHHH', 'HHHHHHHH', 'HHHEEHHH', 'HHHEEHHH',
-  ],
-  // y = 2: deck, core mid-centre
-  [
-    '........', 'HHHHHHHH', 'HHHHHHHH', 'HHHHHHHH', 'HHHCCHHH', 'HHHCCHHH',
-    'HHHHHHHH', 'HHHHHHHH', 'HHHHHHHH', 'HHHHHHHH', 'HHHHHHHH', '........',
+    '...........', '.TTHHHHHTT.', '.TTHHHHHTT.', '.TTHHCHHTT.', '.TTHHCHHTT.',
+    '.TTHHHHHTT.', '.TT.HHH.TT.', '.TT..H..TT.', '...........', '...........',
   ],
 ];
 
-/** Turret sub-grid: 4 × 2 × 6, barrel forward (+z). */
+/** Light A2 turret: compact angular basket, mantlet, and long barrel. */
 export const PLAYER_TURRET_LAYERS: string[][] = [
-  [
-    '.GG.', '.GG.', 'HGGH', 'HHHH', 'HHHH', 'HHHH',
-  ],
-  [
-    '....', '....', '.HH.', '.HH.', '.HH.', '.HH.',
-  ],
+  ['.HHH.', 'HHHHH', 'HHGHH', '.GGG.', '.GGG.', '.GGG.'],
+  ['.....', '.HHH.', '.HHH.', '..G..', '..G..', '..G..'],
 ];
 
 export const GUN_PITCH_MIN = -0.09; // ~ -5°
@@ -106,7 +99,7 @@ export function computeStats(hull: BlockGrid, turret: BlockGrid): TankStats {
     mass,
     topSpeed,
     accel: topSpeed / 2.5,
-    turnRate: 1.8 * clamp(treads / 24, 0.5, 1.5),
+    turnRate: 1.8 * clamp(treads / 72, 0.5, 1.5),
     turretSlew: 2.2,
   };
 }
@@ -132,34 +125,28 @@ export function createTank(id: number, x: number, z: number, heading: number): T
   };
 }
 
-/** Enemy hulls: slower tank is smaller; supertank doubles its treads. */
-const SLOW_HULL: string[][] = [
+/** Light tanks use the chosen Light A2 silhouette with slower tuning. */
+const SLOW_HULL: string[][] = PLAYER_HULL_LAYERS;
+const SLOW_TURRET: string[][] = PLAYER_TURRET_LAYERS;
+
+/** Super C2 — Siege Wedge (chosen 2026-11-26): 13×3×14 heavy hull. */
+const SUPER_HULL: string[][] = [
+  Array(14).fill('TT.........TT'),
   [
-    'THHHHT', 'THHHHT', 'THHHHT', 'THHHHT', 'THHHHT',
-    'THHHHT', 'THHHHT', 'THHHHT', 'THHHHT', 'THHHHT',
+    'TTHHEEEEEHHTT', 'TTHHHHHHHHHTT', 'TTHHHHHHHHHTT', 'TTHHHHHHHHHTT', 'TTHHHHHHHHHTT',
+    'TTHHHHHHHHHTT', 'TTHHHHHHHHHTT', 'TTHHHHHHHHHTT', 'TTHHHHHHHHHTT', 'TTHHHHHHHHHTT',
+    'TTHHHHHHHHHTT', 'TT.HHHHHHH.TT', 'TT..HHHHH..TT', 'TT...HHH...TT',
   ],
   [
-    'HHHHHH', 'HHHHHH', 'HHHHHH', 'HHHHHH', 'HHHHHH',
-    'HHHHHH', 'HHHHHH', 'HHHHHH', 'HHEEHH', 'HHEEHH',
-  ],
-  [
-    '......', 'HHHHHH', 'HHHHHH', 'HHHHHH', 'HHCCHH',
-    'HHCCHH', 'HHHHHH', 'HHHHHH', 'HHHHHH', '......',
+    '.............', '.TTHHHHHHHTT.', '.TTHHHHHHHTT.', '.TTHHHHHHHTT.', '.TTHHHHHHHTT.',
+    '.TTHHHHHHHTT.', '.TTHHHHHHHTT.', '.TTHHHHHHHTT.', '.TTHHHHHHHTT.', '.TTHHHHHHHTT.',
+    '.TT.HHHHH.TT.', '.TT..HHH..TT.', '.TT...H...TT.', '.............',
   ],
 ];
-
-const SLOW_TURRET: string[][] = [
-  ['.G.', 'HGH', 'HHH', 'HHH'],
-  ['...', '...', '.H.', '.H.'],
-];
-
-const SUPER_HULL: string[][] = PLAYER_HULL_LAYERS.map((layer, y) =>
-  y === 0 ? layer.map(() => 'TTHHHHTT') : layer,
-);
 
 const SUPER_TURRET: string[][] = [
-  ['.GG.', '.GG.', '.GG.', 'HGGH', 'HHHH', 'HHHH', 'HHHH'],
-  ['....', '....', '....', '.HH.', '.HH.', '.HH.', '.HH.'],
+  ['.HHHH.', 'HHHHHH', 'HHGGHH', '.HGGH.', '.GGGG.', '.GGGG.', '.GGGG.', '.GGGG.', '.GGGG.'],
+  ['......', '.HHHH.', '.HGGH.', '..GG..', '..GG..', '..GG..', '..GG..', '..GG..', '..GG..'],
 ];
 
 export function createEnemyTank(

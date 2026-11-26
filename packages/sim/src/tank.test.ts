@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { countType, getCell } from './grid';
 import {
+  createEnemyTank,
   createTank,
   GUN_PITCH_MAX,
   GUN_PITCH_MIN,
@@ -26,11 +27,20 @@ describe('tank layout & stats', () => {
     expect(t.stats.turnRate).toBeGreaterThan(0);
   });
 
+  it('uses the chosen Light A2 and Super C2 silhouettes', () => {
+    const light = createTank(0, 0, 0, 0);
+    const superTank = createEnemyTank(1, 'super', 0, 0, 0);
+    expect(light.hull.size).toEqual({ x: 11, y: 3, z: 10 });
+    expect(light.turret.size).toEqual({ x: 5, y: 2, z: 6 });
+    expect(superTank.hull.size).toEqual({ x: 13, y: 3, z: 14 });
+    expect(superTank.turret.size).toEqual({ x: 6, y: 2, z: 9 });
+  });
+
   it('turret pivot sits on the hull deck', () => {
     const t = createTank(0, 0, 0, 0);
     expect(t.turretPivot.y).toBeCloseTo(t.hull.size.y * 0.3);
-    // deck cell under the pivot exists
-    expect(getCell(t.hull, 3, 2, 6)).not.toBeNull();
+    // deck cell under the turret pivot exists
+    expect(getCell(t.hull, 5, 2, 6)).not.toBeNull();
   });
 });
 
