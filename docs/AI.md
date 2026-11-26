@@ -51,7 +51,13 @@ Everything above lives in the shared sim, seeded → identical on host and clien
 ## 4. Aiming model: how AI shots miss believably
 
 - **Perception tick**: AI re-evaluates every 200–400 ms (per type). Between ticks it acts on stale data — dodging works.
+- **State hysteresis**: current targets are sticky, approach/engage bands have
+  separate enter/exit margins, aim points ease toward contacts, and steering
+  has dead zones. This prevents fringe wobble and target flicker.
 - **Turret slew limit**: the turret rotates at a finite rate (45–120°/s by type). Fast tanks can out-turn it.
+- **Hull-first aim**: default aim point is the lower hull (~0.45–0.57 m) with
+  downward gun pitch. Deliberate turret shots are rare (10% light / 15% super,
+  halved against the player).
 - **Error cone**: each shot deviates within a cone (±2–6° by type). The cone **widens** with target angular velocity and range, so strafing and distance are real defenses.
 - **Ranging shots**: the first shot at a fresh contact carries extra bias; follow-ups walk toward the target (bracketing), tightening slightly on hits — capped, never perfect. It *looks* like a human finding the range.
 - **Fire discipline**: shoot only when LOS clear + alignment within tolerance + inside range + cooldown elapsed. Cooldowns 1.4–3.5 s by type.
@@ -96,7 +102,17 @@ Less saucer, more bomber — the default in **every** mode. Every **2 minutes**,
 - **The information trap**: it's worth bonus points, but **shooting it pings your position** — a ~3 s radar blip visible to every player, and a memory refresh for every AI (in solo, the ping feeds the AI). The points piñata that tells everyone where you are.
 - A few hits kill it (first hit claims the bonus); otherwise it despawns on exit. **Radar-invisible until it fires** — each bomb drop blips its position under the universal gunfire rule, so you can hunt it by its own bombs.
 
-### 5.5 Tuning knobs (all data, all seeded)
+### 5.5 Turret loss → 10-second self-destruct
+
+When all gun blocks are destroyed, the tank is automatically doomed:
+
+- A **10-second countdown** starts (HUD warning for the player).
+- AI tanks charge their nearest known target during countdown; the player can
+  drive into an enemy and sacrifice the tank.
+- At zero, the tank detonates with a **4.5 m / 6-damage** blast that hurts every
+  tank nearby, friend or foe, and the wreck shatters into chunks.
+
+### 5.6 Tuning knobs (all data, all seeded)
 
 | Knob | Slow tank | Missile | Supertank |
 |---|---|---|---|
@@ -108,6 +124,7 @@ Less saucer, more bomber — the default in **every** mode. Every **2 minutes**,
 | Preferred range | 60–100 m | dive from 11–16 m | 40–80 m, flanking |
 | Blocked-shot policy | reposition | n/a | shoot destructibles |
 | Penetration budget | standard | impact blast | high |
+| Turret-shot chance | 10% (5% vs player) | n/a | 15% (7.5% vs player) |
 
 Every knob is per-map/per-mode tunable data — the "tone it down" dial is a config file, not a rewrite.
 

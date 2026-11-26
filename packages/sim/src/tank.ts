@@ -53,6 +53,7 @@ export interface Tank {
   alive: boolean;
   cooldown: number; // s until next shot
   spawnTick: number; // for spawn grace
+  selfDestructTick: number | null; // armed when all gun blocks are gone
 }
 
 /**
@@ -122,6 +123,7 @@ export function createTank(id: number, x: number, z: number, heading: number): T
     alive: true,
     cooldown: 0,
     spawnTick: 0,
+    selfDestructTick: null,
   };
 }
 
@@ -178,6 +180,7 @@ export function createEnemyTank(
     alive: true,
     cooldown: 0,
     spawnTick: 0,
+    selfDestructTick: null,
   };
 }
 

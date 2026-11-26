@@ -59,6 +59,7 @@ tuning. A milestone with an un-run play-test is not fully done (BUILD.md §3).
 | F4 | 2026-11-25 | M5 | 5e/5f visuals (status readout, killfeed, hit flash, fence curtains, scan tower) verified by tests/numeric probes only — window hidden | View fence shimmer + drop, status squares under damage, killfeed/hit flash in play; confirm readability in all palettes | **open — awaiting visible window** |
 | F5 | 2026-11-26 | Polish | Four-AI FFA pressure, supertank cadence, airborne missile locks, deadly final-minute volcano, aircraft ease-of-hit, shake timing, and Line2 hierarchy need human feel confirmation | Play a full 10-minute match; confirm pressure is fun not overwhelming, missiles dodgeable, volcano deadly/fair, plane hittable, no distant shake | **open — awaiting human session** |
 | F6 | 2026-11-26 | Regressions | Missile lifetime, turret/hull camera-basis inversion, LineGeometry connector artefacts, enemy blip colour, turret tracking, and the cosmetic radar sweep were user-reported and code-fixed; needs play confirmation | Verify A/ArrowLeft turn the rendered hull/gun screen-left, minimap also moves left, missiles hit, no odd block lines | **open — awaiting human confirmation** |
+| F7 | 2026-11-26 | AI behavior | Hysteresis/target stickiness, hull-first aim, rare turret shots, and 10s turret-loss self-destruct need human feel confirmation | Watch AI at range boundaries, confirm hull hits dominate, destroy a turret and verify countdown/charge/blast | **open — awaiting human session** |
 
 ## Rule
 

@@ -115,6 +115,9 @@ Palette: green phosphor (`#39ff6b`-ish) for the world, red band for HUD (matchin
   - Direct side hit with enough penetration → a **tunnel clean through the tank**, visible from both sides.
 - Impact also chips neighboring cells (splash), so holes grow organically under sustained fire.
 - **Structural integrity**: after damage, flood-fill from `core` cells. Any cluster no longer connected detaches and becomes tumbling line-debris with simple gravity. Shoot a tread clean off and watch it fall away.
+- **Turret-loss self-destruct**: when no gun blocks remain, a 10-second countdown
+  starts. AI charges its target; the player can ram an enemy. At zero, a 4.5 m /
+  6-damage explosion shatters the tank and damages every nearby tank.
 
 ### 5.3 Tank classes (hand-authored — customization scrapped)
 

@@ -40,6 +40,7 @@ export interface HudState {
   killfeed: { text: string; born: number }[];
   hitFlash: { angle: number; born: number } | null;
   elevation: number;
+  selfDestructSeconds: number | null;
   now: number;
 }
 
@@ -237,6 +238,15 @@ export function createHud(): {
       ctx.beginPath();
       ctx.moveTo(rx - 6, ey); ctx.lineTo(rx + 6, ey);
       ctx.stroke();
+    }
+
+    // self-destruct countdown: centered above the status readout
+    if (s.alive && s.selfDestructSeconds !== null) {
+      ctx.font = 'bold 16px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = hud;
+      ctx.fillText(`SELF-DESTRUCT ${Math.ceil(s.selfDestructSeconds)}s`, w / 2, h - 96);
+      ctx.textAlign = 'left';
     }
 
     // blocky status readout

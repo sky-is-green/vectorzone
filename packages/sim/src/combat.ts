@@ -41,7 +41,7 @@ export interface Blast {
   pos: V3;
   radius: number;
   damage: number;
-  source: 'ammo' | 'missile' | 'bomb' | 'volcano' | 'meteor';
+  source: 'ammo' | 'missile' | 'bomb' | 'volcano' | 'meteor' | 'selfDestruct';
 }
 
 export const VOLCANO_BLAST_RADIUS = 7;
@@ -49,6 +49,9 @@ export const VOLCANO_BLAST_DAMAGE = 6;
 export const LAVA_RADIUS = 6;
 export const LAVA_TICKS = 2400; // 40 s
 export const LAVA_DAMAGE = 2;
+export const SELF_DESTRUCT_TICKS = 600; // 10 s
+export const SELF_DESTRUCT_RADIUS = 4.5;
+export const SELF_DESTRUCT_DAMAGE = 6;
 
 export type SimEvent =
   | { kind: 'fire'; pos: V3; dir: V3; owner: number }
@@ -56,7 +59,8 @@ export type SimEvent =
   | { kind: 'blockDestroyed'; pos: V3; by: number | null }
   | { kind: 'explosion'; pos: V3; radius: number; damage: number; source: Blast['source'] | 'airburst' }
   | { kind: 'chunkDetached'; id: number }
-  | { kind: 'tankKilled'; id: number; pos: V3; by: number | null }
+  | { kind: 'tankKilled'; id: number; pos: V3; by: number | null; cause?: 'core' | 'selfDestruct' }
+  | { kind: 'selfDestructArmed'; id: number; pos: V3; seconds: number }
   | { kind: 'kill'; id: number; what: 'missile' | 'bomber'; by: number | null }
   | { kind: 'scanPing' }
   | { kind: 'bomberInbound'; pos: V3 }

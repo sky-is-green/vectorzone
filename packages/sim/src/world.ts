@@ -1,5 +1,5 @@
 import { createRng, type Rng } from './rng';
-import { BLOCK_SIZE, getCell, setCell, type BlockGrid, type BlockType } from './grid';
+import { BLOCK_SIZE, countType, getCell, setCell, type BlockGrid, type BlockType } from './grid';
 import {
   createTank,
   hullToWorld,
@@ -24,6 +24,9 @@ import {
   SHELL_COOLDOWN,
   SHELL_SPEED,
   SPLASH_DAMAGE,
+  SELF_DESTRUCT_TICKS,
+  SELF_DESTRUCT_RADIUS,
+  SELF_DESTRUCT_DAMAGE,
   type Shell,
   type SimEvent,
   type Blast,
@@ -347,7 +350,7 @@ function stepIntegrity(w: World, damaged: Damaged): void {
       if (ctx.tank && ctx.part === 'hull') {
         ctx.tank.alive = false;
         const by = w.lastHitBy.get(ctx.tank.id) ?? null;
-        w.events.push({ kind: 'tankKilled', id: ctx.tank.id, pos: [ctx.tank.x, 1, ctx.tank.z], by });
+        w.events.push({ kind: 'tankKilled', id: ctx.tank.id, pos: [ctx.tank.x, 1, ctx.tank.z], by, cause: 'core' });
         if (ctx.tank.id === 0) {
           w.lives--;
           if (w.lives <= 0) w.phase = 'over';
@@ -365,6 +368,36 @@ function stepIntegrity(w: World, damaged: Damaged): void {
     } else {
       const det = detachDisconnected(g, anchors);
       if (det.length) spawnChunk(w, ctx, det, types);
+    }
+  }
+}
+
+function stepSelfDestruct(w: World, damaged: Damaged): void {
+  for (const t of w.tanks) {
+    if (!t.alive || countType(t.turret, 'gun') > 0) continue;
+    if (t.selfDestructTick === null) {
+      t.selfDestructTick = w.tick + SELF_DESTRUCT_TICKS;
+      w.events.push({ kind: 'selfDestructArmed', id: t.id, pos: [t.x, 1, t.z], seconds: 10 });
+      continue;
+    }
+    if (w.tick < t.selfDestructTick) continue;
+    w.pendingExplosions.push({
+      pos: [t.x, 0.6, t.z],
+      radius: SELF_DESTRUCT_RADIUS,
+      damage: SELF_DESTRUCT_DAMAGE,
+      source: 'selfDestruct',
+    });
+    for (const [g, part] of [[t.hull, 'hull'], [t.turret, 'turret']] as const) {
+      const ctx: GridCtx = { g, tank: t, part };
+      spawnChunk(w, ctx, detachDisconnected(g, []), snapshotTypes(g));
+      damaged.set(g, ctx);
+    }
+    t.alive = false;
+    w.events.push({ kind: 'tankKilled', id: t.id, pos: [t.x, 1, t.z], by: null, cause: 'selfDestruct' });
+    if (t.id === 0) {
+      w.lives--;
+      if (w.lives <= 0) w.phase = 'over';
+      else w.respawnTick = w.tick + 180;
     }
   }
 }
@@ -505,6 +538,7 @@ export function stepWorld(w: World, commands: TankCommand[] = []): void {
     w.lavaPools = w.lavaPools.filter((p) => w.tick < p.untilTick);
   }
   stepIntegrity(w, damaged);
+  stepSelfDestruct(w, damaged);
   stepChunks(w);
   stepAwareness(w);
 
@@ -534,7 +568,7 @@ export function hashWorld(w: World): string {
   const parts: string[] = [`${w.seed}|${w.tick}|${w.rng.state()}|${w.score}|${w.lives}|${w.phase}`];
   for (const t of w.tanks) {
     parts.push(
-      [t.id, t.x, t.z, t.heading, t.speed, t.turretYaw, t.gunPitch, t.hull.rev, t.turret.rev, t.alive ? 1 : 0]
+      [t.id, t.x, t.z, t.heading, t.speed, t.turretYaw, t.gunPitch, t.hull.rev, t.turret.rev, t.alive ? 1 : 0, t.selfDestructTick ?? -1]
         .map((n) => n.toFixed(6))
         .join(','),
     );

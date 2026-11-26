@@ -4,6 +4,7 @@
  * SAME TankCommand a player does. Knobs are data (AI.md §5.5).
  */
 import { hasLos, targetable, type Known } from './awareness';
+import { BLOCK_SIZE, countType } from './grid';
 import { type Tank, type TankCommand } from './tank';
 import type { World } from './world';
 import type { V3 } from './raycast';
@@ -18,16 +19,17 @@ export interface AiKnobs {
   cooldown: [number, number]; // s
   range: [number, number]; // preferred band, m
   blockedPolicy: 'reposition' | 'shoot';
+  turretShotChance: number; // deliberate rare turret aim vs normal hull aim
 }
 
 export const AI_KNOBS: Record<AiKind, AiKnobs> = {
   slow: {
     speedMul: 0.5, slew: 0.785, thinkTicks: 24, err: 0.105,
-    cooldown: [2.5, 3.5], range: [60, 100], blockedPolicy: 'reposition',
+    cooldown: [2.5, 3.5], range: [60, 100], blockedPolicy: 'reposition', turretShotChance: 0.1,
   },
   super: {
     speedMul: 1.2, slew: 2.094, thinkTicks: 15, err: 0.035,
-    cooldown: [1.4, 2.0], range: [40, 80], blockedPolicy: 'shoot',
+    cooldown: [1.4, 2.0], range: [40, 80], blockedPolicy: 'shoot', turretShotChance: 0.15,
   },
 };
 
@@ -37,9 +39,11 @@ export interface AiBrain {
   targetId: number | null;
   /** Director-designated hunter: always prefers the player when known. */
   playerTracker: boolean;
-  aim: { x: number; z: number } | null; // where the turret is pointed
+  aim: { x: number; z: number; y: number } | null; // deliberate world aim point
+  aimY: number;
   strafe: 1 | -1;
   nextThink: number;
+  lastTargetSwitchTick: number;
   blockedTicks: number;
   stuckTicks: number;
   lastShotTick: number;
@@ -57,8 +61,10 @@ export function createBrain(kind: AiKind, playerTracker = false): AiBrain {
     targetId: null,
     playerTracker,
     aim: null,
+    aimY: 0.45,
     strafe: 1,
     nextThink: 0,
+    lastTargetSwitchTick: -9999,
     blockedTicks: 0,
     stuckTicks: 0,
     lastShotTick: -9999,
@@ -80,10 +86,10 @@ const wrap = (a: number): number => {
   return a;
 };
 
-/** Pick a target. One director-designated hunter prefers the player; all
- * other AI prefer other tanks (FFA), falling back to the player only when no
- * AI contact is known. */
-function pickTarget(w: World, t: Tank): { id: number; k: Known } | null {
+/** Pick a target with stickiness. Retain the current contact unless it
+ * expires, the director tracker prefers the player, or a clearly fresher
+ * contact appears after the minimum switch interval. */
+function pickTarget(w: World, t: Tank, brain: AiBrain): { id: number; k: Known } | null {
   const m = w.awareness.get(t.id);
   if (!m) return null;
   const candidates: { id: number; k: Known }[] = [];
@@ -92,17 +98,16 @@ function pickTarget(w: World, t: Tank): { id: number; k: Known } | null {
     if (!target || !targetable(w, target)) continue;
     candidates.push({ id, k });
   }
-  if (brainPrefersPlayer(w, t)) {
+  if (brain.playerTracker) {
     const player = candidates.find((c) => c.id === 0);
     if (player) return player;
   }
+  const current = candidates.find((c) => c.id === brain.targetId);
+  if (current && w.tick - brain.lastTargetSwitchTick < 180) return current;
   const ffa = candidates.filter((c) => c.id !== 0).sort((a, b) => b.k.tick - a.k.tick);
-  if (ffa.length) return ffa[0];
-  return candidates.sort((a, b) => b.k.tick - a.k.tick)[0] ?? null;
-}
-
-function brainPrefersPlayer(w: World, t: Tank): boolean {
-  return w.brains.get(t.id)?.playerTracker ?? false;
+  const best = ffa[0] ?? candidates.sort((a, b) => b.k.tick - a.k.tick)[0] ?? null;
+  if (best && best.id !== brain.targetId) brain.lastTargetSwitchTick = w.tick;
+  return best;
 }
 
 export function thinkBrain(w: World, brain: AiBrain, t: Tank): TankCommand {
@@ -114,7 +119,7 @@ export function thinkBrain(w: World, brain: AiBrain, t: Tank): TankCommand {
   }
   brain.nextThink = w.tick + K.thinkTicks;
 
-  const found = pickTarget(w, t);
+  const found = pickTarget(w, t, brain);
   if (!found) {
     brain.mode = 'approach';
     brain.targetId = null;
@@ -123,7 +128,8 @@ export function thinkBrain(w: World, brain: AiBrain, t: Tank): TankCommand {
     return cmd; // patrol idle: no omniscient hunting
   }
   const contact = found.k;
-  if (brain.targetId !== found.id) brain.shotsAtContact = 0;
+  const switched = brain.targetId !== found.id;
+  if (switched) brain.shotsAtContact = 0;
   brain.targetId = found.id;
 
   const d = Math.hypot(contact.x - t.x, contact.z - t.z);
@@ -145,16 +151,35 @@ export function thinkBrain(w: World, brain: AiBrain, t: Tank): TankCommand {
         z: clamp(contact.z + Math.cos(a) * 40, -190, 190),
       };
     }
-    // 'shoot' policy: supertanks fire at memory through destructible cover
-  } else if (d > K.range[1] + 20) {
-    brain.mode = 'approach';
-  } else if (d >= K.range[0] * 0.6) {
+  } else if (brain.mode === 'engage') {
+    // hysteresis: leave only well outside the band; back off when too close
+    if (d > K.range[1] + 15) brain.mode = 'approach';
+    else if (d < K.range[0] - 15) {
+      brain.mode = 'reposition';
+      const away = Math.atan2(t.x - contact.x, t.z - contact.z);
+      brain.reposition = {
+        x: clamp(t.x + Math.sin(away) * 35, -190, 190),
+        z: clamp(t.z + Math.cos(away) * 35, -190, 190),
+      };
+    }
+  } else if (brain.mode === 'approach' && d < K.range[1] - 10) {
     brain.mode = 'engage';
   }
 
-  // aim point: live contact if LOS, else decaying memory (where you WERE)
-  brain.aim = { x: contact.x, z: contact.z };
-  brain.debug.intent = [contact.x, 1.2, contact.z];
+  // Normally aim at the lower hull; deliberate turret shots are rare and
+  // half as likely against the player. Keep the choice stable for several shots.
+  if (switched || brain.shotsAtContact === 0 || brain.shotsAtContact % 8 === 0) {
+    const target = w.tanks.find((x) => x.id === found.id);
+    const chance = K.turretShotChance * (target?.id === 0 ? 0.5 : 1);
+    brain.aimY = w.rng.next() < chance ? 1.2 : 0.45 + w.rng.next() * 0.12;
+  }
+  const blend = brain.aim ? 0.35 : 1;
+  brain.aim = {
+    x: brain.aim ? brain.aim.x + (contact.x - brain.aim.x) * blend : contact.x,
+    z: brain.aim ? brain.aim.z + (contact.z - brain.aim.z) * blend : contact.z,
+    y: brain.aimY,
+  };
+  brain.debug.intent = [brain.aim.x, brain.aim.y, brain.aim.z];
   return execute(w, brain, t, cmd, K);
 }
 
@@ -165,17 +190,26 @@ function execute(
   cmd: TankCommand,
   K: AiKnobs,
 ): TankCommand {
+  const turretDead = countType(t.turret, 'gun') === 0;
   const goal =
     brain.mode === 'reposition' && brain.reposition
       ? brain.reposition
       : brain.aim
-        ? orbitPoint(brain, t, brain.aim, K)
+        ? turretDead
+          ? brain.aim
+          : orbitPoint(brain, t, brain.aim, K)
         : null;
   if (goal) {
     const want = angTo(t, goal);
     const dh = wrap(want - t.heading);
-    cmd.turn = clamp(dh * 2, -1, 1);
-    cmd.throttle = Math.abs(dh) > 1.2 ? 0.2 : brain.mode === 'engage' ? 0.5 : 1;
+    cmd.turn = Math.abs(dh) < 0.025 ? 0 : clamp(dh * 1.6, -1, 1);
+    cmd.throttle = turretDead
+      ? 1
+      : Math.abs(dh) > 1.1
+        ? 0.15
+        : brain.mode === 'engage'
+          ? 0.35
+          : 0.85;
     // stuck = commanded to move but position didn't change (not accel ramp)
     const moved = Math.hypot(t.x - brain.lastX, t.z - brain.lastZ);
     if (cmd.throttle > 0 && moved < 0.02) brain.stuckTicks += K.thinkTicks;
@@ -192,12 +226,14 @@ function execute(
       };
     }
   }
+  if (turretDead) return cmd; // charge the target during self-destruct countdown
   if (brain.aim) {
     const wantYaw = wrap(angTo(t, brain.aim) - t.heading);
     const dYaw = wrap(wantYaw - t.turretYaw);
-    cmd.turretYaw = clamp(dYaw * 3, -1, 1);
+    cmd.turretYaw = Math.abs(dYaw) < 0.015 ? 0 : clamp(dYaw * 3, -1, 1);
     const d = Math.hypot(brain.aim.x - t.x, brain.aim.z - t.z);
-    const wantPitch = Math.atan2(1.2 - 1.2, d); // flat fire at tank height
+    const muzzleY = t.turretPivot.y + BLOCK_SIZE;
+    const wantPitch = Math.atan2(brain.aim.y - muzzleY, d);
     cmd.gunPitch = clamp((wantPitch - t.gunPitch) * 3, -1, 1);
 
     const aligned = Math.abs(dYaw) < 0.1;

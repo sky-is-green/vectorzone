@@ -755,6 +755,7 @@ function frame(now: number): void {
     else if (ev.kind === 'ionStorm') hud.alert('ION STORM — RADAR DOWN');
     else if (ev.kind === 'meteorInbound') hud.alert('METEOR INBOUND');
     else if (ev.kind === 'missileLock') hud.alert('MISSILE LOCK');
+    else if (ev.kind === 'selfDestructArmed' && ev.id === 0) hud.alert('SELF-DESTRUCT ARMED — 10s');
     else if (ev.kind === 'bombTelegraph') lastBombBlip = now;
     if (ev.kind === 'fire' && ev.owner === 0) shakeAmp = Math.min(0.35, shakeAmp + 0.035);
     if (ev.kind === 'explosion') {
@@ -765,7 +766,9 @@ function frame(now: number): void {
     // killfeed + directional hit flash
     if (ev.kind === 'tankKilled') {
       if (ev.id === 0) {
-        killfeed.push({ text: ev.by === null ? 'THE ZONE KILLED YOU' : 'ENEMY KILLED YOU', born: now });
+        killfeed.push({ text: ev.cause === 'selfDestruct' ? 'YOU SELF-DESTRUCTED' : ev.by === null ? 'THE ZONE KILLED YOU' : 'ENEMY KILLED YOU', born: now });
+      } else if (ev.cause === 'selfDestruct') {
+        killfeed.push({ text: 'ENEMY SELF-DESTRUCTED', born: now });
       } else if (ev.by === 0) {
         killfeed.push({ text: `YOU KILLED ${world.brains.get(ev.id)?.kind === 'super' ? 'SUPERTANK' : 'TANK'}`, born: now });
       }
@@ -938,6 +941,7 @@ function frame(now: number): void {
     killfeed,
     hitFlash,
     elevation: tank.gunPitch,
+    selfDestructSeconds: tank.selfDestructTick === null ? null : Math.max(0, (tank.selfDestructTick - world.tick) / 60),
     now,
   });
 

@@ -35,6 +35,8 @@ describe('polish: four AI + FFA + player hunter', () => {
       [0, { x: w.tanks[0].x, z: w.tanks[0].z, heading: 0, turretYaw: 0, tick: 1, source: 'ping' }],
       [other.id, { x: other.x, z: other.z, heading: other.heading, turretYaw: other.turretYaw, tick: w.tick, source: 'ping' }],
     ]));
+    w.brains.get(ai.id)!.lastTargetSwitchTick = -9999;
+    w.brains.get(ai.id)!.nextThink = 0;
     thinkBrain(w, w.brains.get(ai.id)!, ai);
     expect(w.brains.get(ai.id)!.targetId).toBe(other.id);
   });
