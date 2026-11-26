@@ -16,6 +16,7 @@ export function hullTurnAxisFromKeys(left: boolean, right: boolean): number {
 }
 
 const HELD = new Set<string>();
+let fireWasDown = false;
 const CAPTURED = new Set([
   'KeyW', 'KeyA', 'KeyS', 'KeyD',
   'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
@@ -47,7 +48,10 @@ export function readCommand(): TankCommand {
   c.turn = hullTurnAxisFromKeys(HELD.has('KeyA'), HELD.has('KeyD'));
   c.turretYaw = turretAxisFromKeys(HELD.has('ArrowLeft'), HELD.has('ArrowRight'));
   c.gunPitch = (HELD.has('ArrowUp') ? 1 : 0) - (HELD.has('ArrowDown') ? 1 : 0);
-  c.fire = HELD.has('Space');
+  const fireDown = HELD.has('Space');
+  c.fire = fireDown;
+  c.firePressed = fireDown && !fireWasDown;
+  fireWasDown = fireDown;
   // gamepad: left stick drive, right stick aim, A/RT fire (M8)
   const pads = navigator.getGamepads ? navigator.getGamepads() : [];
   for (const p of pads) {

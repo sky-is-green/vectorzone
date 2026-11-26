@@ -19,6 +19,8 @@ export interface TankCommand {
   turretYaw: number; // [-1, 1] turret slew rate
   gunPitch: number; // [-1, 1] elevation rate
   fire: boolean;
+  /** True only on the tick/frame the fire button was newly pressed. */
+  firePressed?: boolean;
 }
 
 export const neutralCommand = (): TankCommand => ({
@@ -27,6 +29,7 @@ export const neutralCommand = (): TankCommand => ({
   turretYaw: 0,
   gunPitch: 0,
   fire: false,
+  firePressed: false,
 });
 
 export interface TankStats {

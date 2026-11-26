@@ -437,7 +437,13 @@ export function stepWorld(w: World, commands: TankCommand[] = []): void {
   const damaged: Damaged = new Map();
 
   // solo respawn after the 3 s deathcam
-  if (w.phase === 'play' && !w.tanks[0].alive && w.respawnTick > 0 && w.tick >= w.respawnTick) {
+  if (
+    w.phase === 'play' &&
+    !w.tanks[0].alive &&
+    w.respawnTick > 0 &&
+    w.tick >= w.respawnTick &&
+    commands[0]?.firePressed
+  ) {
     const a = w.rng.next() * Math.PI * 2;
     const fresh = createTank(0, Math.sin(a) * 120, Math.cos(a) * 120, w.rng.next() * Math.PI * 2);
     fresh.spawnTick = w.tick;

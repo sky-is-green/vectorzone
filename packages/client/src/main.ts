@@ -986,6 +986,7 @@ function frame(now: number): void {
       label: spectatorLabel(spectatedTank, world.brains.get(spectatedTank.id)?.kind),
       secondsLeft: Math.max(0, (world.respawnTick - world.tick) / 60),
     } : null,
+    respawnReady: !tank.alive && world.respawnTick > 0 && world.tick >= world.respawnTick,
     now,
   });
 

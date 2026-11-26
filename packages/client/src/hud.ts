@@ -43,6 +43,7 @@ export interface HudState {
   elevation: number;
   selfDestructSeconds: number | null;
   spectator: { label: string; secondsLeft: number } | null;
+  respawnReady: boolean;
   now: number;
 }
 
@@ -262,10 +263,18 @@ export function createHud(): {
       ctx.textAlign = 'center';
       ctx.fillStyle = hud;
       ctx.fillText(
-        `SPECTATING ${s.spectator.label} · ←/→ CYCLE · RESPAWN ${Math.ceil(s.spectator.secondsLeft)}s`,
+        s.respawnReady
+          ? `SPECTATING ${s.spectator.label} · ←/→ CYCLE · PRESS SPACE TO RESPAWN`
+          : `SPECTATING ${s.spectator.label} · ←/→ CYCLE · RESPAWN ${Math.ceil(s.spectator.secondsLeft)}s`,
         w / 2,
         h / 2 + 54,
       );
+      ctx.textAlign = 'left';
+    } else if (s.respawnReady) {
+      ctx.font = 'bold 13px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = hud;
+      ctx.fillText('PRESS SPACE TO RESPAWN', w / 2, h / 2 + 54);
       ctx.textAlign = 'left';
     }
 
