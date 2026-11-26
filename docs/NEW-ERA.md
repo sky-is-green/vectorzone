@@ -21,7 +21,7 @@ These are holes in the current docs. None block M0–M4; each gets locked at the
 ### A2. Death & respawn experience (needed by M3/M5)
 
 - Core destroyed → the whole tank shatters into detached debris, bloom flash + shake, killfeed entry.
-- 3 s deathcam: hold on the wreck, show "killed by X" (or "the zone"), then respawn. No killcam replay in v1 (stretch).
+- During the **3 s respawn delay**, the player spectates living tanks with a chase camera; **←/→** cycles targets, starting on the killer when possible. HUD shows the target and countdown. No killcam replay in v1 (stretch).
 
 ### A3. HUD completeness (needed by M5)
 
