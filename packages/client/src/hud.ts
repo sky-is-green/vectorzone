@@ -40,6 +40,7 @@ export interface HudState {
   status: { core: number; tread: number; gun: number; engine: number };
   killfeed: { text: string; born: number }[];
   hitFlash: { angle: number; born: number } | null;
+  threatBearing: { angle: number; progress: number } | null;
   elevation: number;
   selfDestructSeconds: number | null;
   spectator: { label: string; secondsLeft: number } | null;
@@ -212,6 +213,16 @@ export function createHud(): {
         const r = Math.random() * RADAR_R;
         ctx.fillRect(cx + Math.sin(a) * r, cy - Math.cos(a) * r, 1.5, 1.5);
       }
+    }
+
+    // incoming-damage bearing: red arrow on the radar rim, fading over 2.5 s
+    if (s.threatBearing) {
+      const a = s.threatBearing.angle;
+      const r = RADAR_R - 5;
+      const px = cx + Math.sin(a) * r;
+      const py = cy - Math.cos(a) * r;
+      const alpha = Math.max(0, 1 - s.threatBearing.progress);
+      triangle(px, py, a, 5, `rgba(255,68,51,${alpha.toFixed(3)})`);
     }
 
     // own hull arrow + turret tick

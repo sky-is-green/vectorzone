@@ -20,6 +20,7 @@ Nothing else is visible by default. A distant, silent tank is **dark**.
 | **Scan-tower ping** | every tank's position, all radars | every ~10 s while a tower lives; blips fade ~3 s |
 | **Missile lock** | player-targeted missile arrow, pulsing red | while alive |
 | **All airborne missiles** | orange heading arrows | while alive |
+| **Incoming damage** | red bearing arrow on the radar rim toward the impact/attacker | ~2.5 s fade |
 | **Scanner objective** | blue diamond; expanding blue pulse on each ping | while standing |
 | **Bomber bomb drop** | the bomber blips (it fired — rule 1 applies) | ~3 s fade |
 | **Ion storm** | nothing — scope full of static | storm duration |

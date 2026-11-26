@@ -38,7 +38,7 @@ import { ParticlePool } from './particles';
 import { createPost } from './post';
 import { buildChunkGeometry, buildRubbleGeometry, buildScenery } from './scenery';
 import { buildPanel, loadSettings, saveSettings, type Settings } from './settings';
-import { pulseProgress } from './radar';
+import { pulseProgress, radarBearing } from './radar';
 import { livingSpectators, nextSpectatorId, spectatorLabel } from './spectator';
 import { explosionShake, impactShake } from './feedback';
 import './style.css';
@@ -182,6 +182,7 @@ let lastScanPing = -1e9;
 let matchReported = false;
 const killfeed: { text: string; born: number }[] = [];
 let hitFlash: { angle: number; born: number } | null = null;
+let playerThreat: { angle: number; born: number } | null = null;
 
 // local leaderboard + results screen (5g)
 const SCORES_KEY = 'vectorzone-scores';
@@ -807,11 +808,17 @@ function frame(now: number): void {
       killfeed.push({ text: ev.what === 'bomber' ? 'YOU DOWNED BOMBER' : 'YOU DOWNED MISSILE', born: now });
     }
     if (ev.kind === 'blockDestroyed' && ev.by !== 0 && Math.hypot(ev.pos[0] - tank.x, ev.pos[2] - tank.z) < 4) {
-      hitFlash = { angle: Math.atan2(ev.pos[0] - tank.x, ev.pos[2] - tank.z) - tank.heading, born: now };
-      shakeAmp = Math.min(0.5, shakeAmp + impactShake(Math.hypot(ev.pos[0] - tank.x, ev.pos[2] - tank.z)));
+      const dx = ev.pos[0] - tank.x;
+      const dz = ev.pos[2] - tank.z;
+      hitFlash = { angle: radarBearing(dx, dz, tank.heading), born: now };
+      playerThreat = { angle: radarBearing(dx, dz, tank.heading), born: now };
+      shakeAmp = Math.min(0.5, shakeAmp + impactShake(Math.hypot(dx, dz)));
     }
     if (ev.kind === 'explosion' && Math.hypot(ev.pos[0] - tank.x, ev.pos[2] - tank.z) < 6) {
-      hitFlash = { angle: Math.atan2(ev.pos[0] - tank.x, ev.pos[2] - tank.z) - tank.heading, born: now };
+      const dx = ev.pos[0] - tank.x;
+      const dz = ev.pos[2] - tank.z;
+      hitFlash = { angle: radarBearing(dx, dz, tank.heading), born: now };
+      playerThreat = { angle: radarBearing(dx, dz, tank.heading), born: now };
     }
     if (ev.kind === 'fire') {
       for (let i = 0; i < 8; i++) {
@@ -980,6 +987,9 @@ function frame(now: number): void {
     },
     killfeed,
     hitFlash,
+    threatBearing: playerThreat && now - playerThreat.born < 2500
+      ? { angle: playerThreat.angle, progress: (now - playerThreat.born) / 2500 }
+      : null,
     elevation: tank.gunPitch,
     selfDestructSeconds: tank.selfDestructTick === null ? null : Math.max(0, (tank.selfDestructTick - world.tick) / 60),
     spectator: spectatedTank ? {

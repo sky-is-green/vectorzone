@@ -108,6 +108,12 @@ function pickTarget(w: World, t: Tank, brain: AiBrain): { id: number; k: Known }
     if (!target || !targetable(w, target)) continue;
     candidates.push({ id, k });
   }
+  // Retaliation: a recent hit source outranks ordinary scan/gunfire contacts.
+  const threat = w.threats.get(t.id);
+  if (threat && w.tick - threat.tick < 360) {
+    const attacker = candidates.find((c) => c.id === threat.from);
+    if (attacker) return attacker;
+  }
   if (brain.playerTracker) {
     const player = candidates.find((c) => c.id === 0);
     if (player) return player;

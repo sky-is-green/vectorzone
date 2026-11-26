@@ -107,6 +107,40 @@ describe('AI aim & hysteresis', () => {
     expect(Math.hypot(ai.x - start.x, ai.z - start.z)).toBeGreaterThan(1);
   });
 
+  it('prioritizes a recent attacker over ordinary contacts', () => {
+    const w = duel(70, 'slow');
+    const attacker = createEnemyTank(2, 'slow', 40, 40, 0);
+    attacker.spawnTick = -1000;
+    w.tanks.push(attacker);
+    const brain = w.brains.get(1)!;
+    brain.targetId = null;
+    brain.lastTargetSwitchTick = -9999;
+    w.awareness.get(1)!.set(2, { x: attacker.x, z: attacker.z, heading: 0, turretYaw: 0, tick: w.tick - 20, source: 'ping' });
+    w.threats.set(1, { tick: w.tick, from: 2 });
+    thinkBrain(w, brain, w.tanks[1]);
+    expect(brain.targetId).toBe(2);
+  });
+
+  it('forgets the attacker after the retaliation duration', () => {
+    const w = duel(70, 'slow');
+    const brain = w.brains.get(1)!;
+    brain.targetId = null;
+    brain.lastTargetSwitchTick = -9999;
+    w.threats.set(1, { tick: w.tick - 361, from: 0 });
+    thinkBrain(w, brain, w.tanks[1]);
+    expect(brain.targetId).toBe(0);
+  });
+
+  it('records the attacker when a shell damages the tank', () => {
+    const w = duel(70, 'slow');
+    w.brains.delete(1); // freeze target so the test shell lands
+    w.fences = []; // keep the test lane clear of the classic energy fence
+    w.shells.push({ id: 999, owner: 0, pos: [0, 1.2, 70], dir: [0, 0, 1], budget: 6, alive: true });
+    stepWorld(w, [N]);
+    stepWorld(w, [N]);
+    expect(w.threats.get(1)?.from).toBe(0);
+  });
+
   it('investigates ping information without firing until visual confirmation', () => {
     const w = duel(70, 'slow');
     w.structures.push(makeStructure(600, 'tower', 0, 35));

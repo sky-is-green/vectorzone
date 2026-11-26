@@ -190,6 +190,7 @@ function destroyCell(w: World, ctx: GridCtx, c: V3, damaged: Damaged, by: number
   const wp = cellWorld(ctx, c);
   setCell(ctx.g, c[0], c[1], c[2], null);
   damaged.set(ctx.g, ctx);
+  if (ctx.tank && by !== null) w.threats.set(ctx.tank.id, { tick: w.tick, from: by });
   w.events.push({ kind: 'blockDestroyed', pos: wp, by });
   if (b.type === 'ammo') {
     w.pendingExplosions.push({ pos: wp, radius: EXPLOSION_RADIUS, damage: EXPLOSION_DAMAGE, source: 'ammo' });
@@ -209,6 +210,7 @@ function damageCell(w: World, ctx: GridCtx, c: V3, dmg: number, damaged: Damaged
   if (!b) return;
   b.hp -= dmg;
   damaged.set(ctx.g, ctx);
+  if (ctx.tank && by !== null) w.threats.set(ctx.tank.id, { tick: w.tick, from: by });
   if (b.hp <= 0) destroyCell(w, ctx, c, damaged, by);
 }
 

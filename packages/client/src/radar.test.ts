@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { headingFromDir, projectRadar, pulseProgress, radarDisplayYaw, radarPointer, relativeHeading } from './radar';
+import { headingFromDir, projectRadar, pulseProgress, radarBearing, radarDisplayYaw, radarPointer, relativeHeading } from './radar';
 
 describe('radar projection + orientation', () => {
   it('forward contact points up', () => {
@@ -49,5 +49,11 @@ describe('radar projection + orientation', () => {
     expect(pulseProgress(1000, 1000)).toBe(0);
     expect(pulseProgress(1600, 1000)).toBeCloseTo(0.5);
     expect(pulseProgress(2200, 1000)).toBeNull();
+  });
+
+  it('damage bearing is relative to own hull heading', () => {
+    expect(radarBearing(0, 60, 0)).toBeCloseTo(0);
+    expect(radarBearing(60, 0, 0)).toBeCloseTo(Math.PI / 2);
+    expect(radarBearing(60, 0, Math.PI / 2)).toBeCloseTo(0);
   });
 });

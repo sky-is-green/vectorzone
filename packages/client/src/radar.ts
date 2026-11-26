@@ -46,3 +46,8 @@ export function pulseProgress(now: number, startedAt: number, duration = 1200): 
   const age = now - startedAt;
   return age >= 0 && age < duration ? age / duration : null;
 }
+
+/** Bearing from own hull to a world point, for heading-up radar markers. */
+export function radarBearing(dx: number, dz: number, ownHeading: number): number {
+  return Math.atan2(dx, dz) - ownHeading;
+}
