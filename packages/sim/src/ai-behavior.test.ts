@@ -60,7 +60,7 @@ describe('AI aim & hysteresis', () => {
     brain.mode = 'engage';
     const near = thinkBrain(w, brain, w.tanks[1]);
     expect(brain.mode).toBe('engage');
-    expect(near.throttle).toBe(0); // inside band: stop and fight
+    expect(near.throttle).toBeGreaterThan(0); // mid-range strafe, never sit still
 
     w.tanks[1].z = 101; // well beyond high+10
     w.awareness.get(1)!.set(0, { x: 0, z: 0, heading: 0, turretYaw: 0, tick: w.tick, source: 'los' });
@@ -68,6 +68,43 @@ describe('AI aim & hysteresis', () => {
     const far = thinkBrain(w, brain, w.tanks[1]);
     expect(brain.mode).toBe('engage');
     expect(far.throttle).toBeGreaterThan(0); // close the distance
+  });
+
+  it('advances, retreats, and evades incoming fire instead of sitting still', () => {
+    const w = duel(70, 'slow');
+    const brain = w.brains.get(1)!;
+    const mid = thinkBrain(w, brain, w.tanks[1]);
+    expect(mid.throttle).toBeGreaterThan(0);
+
+    w.tanks[1].z = 130;
+    brain.nextThink = 0;
+    const far = thinkBrain(w, brain, w.tanks[1]);
+    expect(far.throttle).toBeGreaterThan(0.5);
+
+    w.tanks[1].z = 20;
+    brain.nextThink = 0;
+    const close = thinkBrain(w, brain, w.tanks[1]);
+    expect(close.throttle).toBeGreaterThan(0);
+
+    w.tanks[1].z = 70;
+    w.threats.set(1, { tick: w.tick, from: 0 });
+    brain.nextThink = 0;
+    const evade = thinkBrain(w, brain, w.tanks[1]);
+    expect(evade.throttle).toBeGreaterThan(0);
+    expect(brain.debug.evading).toBe(true);
+  });
+
+  it('fires while maneuvering, not only while stationary', () => {
+    const w = duel(70, 'slow');
+    const ai = w.tanks[1];
+    const start = { x: ai.x, z: ai.z };
+    let shots = 0;
+    for (let i = 0; i < 600; i++) {
+      stepWorld(w, [N]);
+      shots += w.events.filter((e) => e.kind === 'fire' && e.owner === ai.id).length;
+    }
+    expect(shots).toBeGreaterThan(0);
+    expect(Math.hypot(ai.x - start.x, ai.z - start.z)).toBeGreaterThan(1);
   });
 
   it('investigates ping information without firing until visual confirmation', () => {

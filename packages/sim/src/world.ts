@@ -75,6 +75,7 @@ export interface World {
   // M5: awareness, AI, director, solo loop
   awareness: Map<number, Map<number, Known>>;
   brains: Map<number, AiBrain>;
+  threats: Map<number, { tick: number; from: number }>;
   missiles: Missile[];
   bomber: Bomber | null;
   telegraphs: Telegraph[];
@@ -119,6 +120,7 @@ export function createWorld(seed: number, map: MapId = 'classic'): World {
     nextId: 1,
     awareness: new Map(),
     brains: new Map(),
+    threats: new Map(),
     missiles: [],
     bomber: null,
     telegraphs: [],
@@ -599,6 +601,7 @@ export function hashWorld(w: World): string {
     `vol${w.volcano.state}`,
     `lava${w.lavaPools.length}`,
     `fen${w.fences.filter((f) => fenceAlive(w, f)).length}`,
+    `threat${[...w.threats.entries()].sort((a, b) => a[0] - b[0]).map(([id, v]) => `${id}:${v.tick}:${v.from}`).join(',')}`,
     `spawn${w.nextSpawnTick}:${w.nextSuperTick}:${w.nextMissileTick}`,
   );
   for (const m of w.missiles) {

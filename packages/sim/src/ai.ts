@@ -46,6 +46,8 @@ export interface AiBrain {
   investigateGoal: { x: number; z: number } | null;
   searchCenter: { x: number; z: number } | null;
   searchUntilTick: number;
+  maneuverDirection: 1 | -1;
+  nextManeuverTick: number;
   reposition: { x: number; z: number } | null;
   nextThink: number;
   lastTargetSwitchTick: number;
@@ -54,7 +56,7 @@ export interface AiBrain {
   shotsAtContact: number;
   lastX: number;
   lastZ: number;
-  debug: { intent: V3 | null; los: boolean; err: number };
+  debug: { intent: V3 | null; los: boolean; err: number; evading: boolean };
 }
 
 export function createBrain(kind: AiKind, playerTracker = false): AiBrain {
@@ -69,6 +71,8 @@ export function createBrain(kind: AiKind, playerTracker = false): AiBrain {
     investigateGoal: null,
     searchCenter: null,
     searchUntilTick: 0,
+    maneuverDirection: 1,
+    nextManeuverTick: 0,
     reposition: null,
     nextThink: 0,
     lastTargetSwitchTick: -9999,
@@ -77,7 +81,7 @@ export function createBrain(kind: AiKind, playerTracker = false): AiBrain {
     shotsAtContact: 0,
     lastX: 0,
     lastZ: 0,
-    debug: { intent: null, los: false, err: 0 },
+    debug: { intent: null, los: false, err: 0, evading: false },
   };
 }
 
@@ -280,14 +284,39 @@ function execute(w: World, brain: AiBrain, t: Tank, cmd: TankCommand): TankComma
     }
   } else if (brain.mode === 'engage' && target) {
     const d = dist2(t, target);
-    // Hold a range band instead of orbiting a fixed point (the old wobble).
-    if (d > K.range[1] + 10) {
+    const threat = w.threats.get(t.id);
+    const underFire = threat !== undefined && w.tick - threat.tick < 90;
+    brain.debug.evading = underFire;
+    if (underFire) {
+      // evade incoming fire: back away from the threat and add lateral motion
+      const away = Math.atan2(t.x - target.x, t.z - target.z);
+      const side = away + brain.maneuverDirection * 0.7;
+      goal = {
+        x: clamp(t.x + Math.sin(side) * 28, -190, 190),
+        z: clamp(t.z + Math.cos(side) * 28, -190, 190),
+      };
+      throttle = 0.8;
+    } else if (d > K.range[1]) {
+      // close distance to tighten the shot
       goal = target;
-      throttle = 0.6;
-    } else if (d < K.range[0] - 10) {
+      throttle = 0.65;
+    } else if (d < K.range[0]) {
+      // too close: restore the band
       const away = Math.atan2(t.x - target.x, t.z - target.z);
       goal = { x: clamp(t.x + Math.sin(away) * 25, -190, 190), z: clamp(t.z + Math.cos(away) * 25, -190, 190) };
-      throttle = 0.5;
+      throttle = 0.55;
+    } else {
+      // mid-range combat strafe; reverse only on a slow timer, never per tick
+      if (w.tick >= brain.nextManeuverTick) {
+        brain.maneuverDirection = brain.maneuverDirection === 1 ? -1 : 1;
+        brain.nextManeuverTick = w.tick + 120 + Math.floor(w.rng.next() * 120);
+      }
+      const side = angTo(target, t) + brain.maneuverDirection * (Math.PI / 2);
+      goal = {
+        x: clamp(t.x + Math.sin(side) * 22, -190, 190),
+        z: clamp(t.z + Math.cos(side) * 22, -190, 190),
+      };
+      throttle = 0.3;
     }
   }
 

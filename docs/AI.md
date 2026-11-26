@@ -61,7 +61,7 @@ Everything above lives in the shared sim, seeded → identical on host and clien
 - **Error cone**: each shot deviates within a cone (±2–6° by type). The cone **widens** with target angular velocity and range, so strafing and distance are real defenses.
 - **Ranging shots**: the first shot at a fresh contact carries extra bias; follow-ups walk toward the target (bracketing), tightening slightly on hits — capped, never perfect. It *looks* like a human finding the range.
 - **Fire discipline**: shoot only when LOS clear + alignment within tolerance + inside range + cooldown elapsed. Cooldowns 1.4–3.5 s by type.
-- **Blocked shot policy**: if destructible cover blocks LOS → reposition. If it persists, supertanks shoot through it (your cover erodes under fire). Slow tanks just reposition. There is no indestructible object class.
+- **Blocked shot policy**: information without visual confirmation always means investigate, never fire. Supertanks are faster and more accurate, but they do not shoot through unseen cover.
 
 ---
 
@@ -87,7 +87,8 @@ Everything above lives in the shared sim, seeded → identical on host and clien
 
 - Everything the slow tank does, faster: hull ~1.2× player, turret slew 120°/s, tighter cone, shorter cooldown.
 - **Flanks**: approach vectors offset from your heading; strafes while firing.
-- **Shoots destructible cover** when blocked instead of politely repositioning.
+- **Faster investigation and engagement**, but still no firing without visual confirmation.
+- More aggressive advance/strafe/evade timing; same human-like aim limits.
 - Still bound by every fairness rule above — beatable by movement, cover play, and focus fire.
 
 ### 5.4 The bomber — the flying piñata (all modes)
@@ -122,7 +123,7 @@ When all gun blocks are destroyed, the tank is automatically doomed:
 | Base aim error | ±6° | ±3° lead error | ±2° |
 | Fire cooldown | 2.5–3.5 s | one committed shot | 1.4–2.0 s |
 | Preferred range | 60–100 m | dive from 11–16 m | 40–80 m, flanking |
-| Blocked-shot policy | reposition | n/a | shoot destructibles |
+| Blocked-shot policy | investigate | n/a | investigate |
 | Penetration budget | standard | impact blast | high |
 | Turret-shot chance | 10% (5% vs player) | n/a | 15% (7.5% vs player) |
 

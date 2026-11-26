@@ -130,7 +130,17 @@ export function stepAwareness(w: World): void {
       const shooter = w.tanks.find((t) => t.id === ev.owner);
       if (!shooter || !targetable(w, shooter)) continue;
       for (const o of observers) {
-        if (o.id !== shooter.id) refresh(w, o, shooter, 'gunfire');
+        if (o.id === shooter.id) continue;
+        refresh(w, o, shooter, 'gunfire');
+        // Did this shot pass close enough to threaten the observer?
+        const to: V3 = [o.x - ev.pos[0], 1.2 - ev.pos[1], o.z - ev.pos[2]];
+        const along = Math.max(0, Math.min(120, to[0] * ev.dir[0] + to[1] * ev.dir[1] + to[2] * ev.dir[2]));
+        const miss = Math.hypot(
+          to[0] - ev.dir[0] * along,
+          to[1] - ev.dir[1] * along,
+          to[2] - ev.dir[2] * along,
+        );
+        if (miss < 3.5) w.threats.set(o.id, { tick: w.tick, from: shooter.id });
       }
     } else if (ev.kind === 'scanPing') {
       for (const o of observers) {
