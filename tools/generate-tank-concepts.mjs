@@ -86,6 +86,81 @@ const designs = [
       ['......','..HH..','..HH..','..G...','..G...','..G...','..G...','..G...'],
     ],
   },
+  {
+    id: 'light-v2-a', name: 'LIGHT A2 — LOW WEDGE', cls: 'LIGHT TANK',
+    hull: [
+      Array(10).fill('TT.......TT'),
+      ['TTHHEEEHHTT','TTHHHHHHHHT','TTHHHHHHHHT','TTHHHHHHHHT','TTHHHHHHHHT','TTHHHHHHHHT','TTHHHHHHHHT','TTHHHHHHHHT','TT.HHHHH.TT','TT..HHH..TT'],
+      ['...........','.TTHHHHHTT.','.TTHHHHHTT.','.TTHHCHHTT.','.TTHHCHHTT.','.TTHHHHHTT.','.TT.HHH.TT.','.TT..H..TT.','...........','...........'],
+    ],
+    turret: [
+      ['.HHH.','HHHHH','HHGHH','.GGG.','.GGG.','.GGG.'],
+      ['.....','.HHH.','.HHH.','..G..','..G..','..G..'],
+    ],
+  },
+  {
+    id: 'light-v2-b', name: 'LIGHT B2 — ARMORED WEDGE', cls: 'LIGHT TANK',
+    hull: [
+      Array(10).fill('TT.......TT'),
+      ['TTHHEEEHHTT','TTHHHHHHHHT','TTHHHHHHHHT','TTHHHHHHHHT','TTHHHHHHHHT','TTHHHHHHHHT','TTHHHHHHHHT','TTHHHHHHHHT','TT.HHHHH.TT','TT..HHH..TT'],
+      ['...........','.TTHHHHHTT.','.TTHHHHHTT.','.TTHHCHHTT.','.TTHHCHHTT.','.TTHHHHHTT.','.TT.HHH.TT.','.TT..H..TT.','...........','...........'],
+      ['...........','...HHHHH...','...HHHHH...','...HHHHH...','....HHH....','....HHH....','.....H.....','...........','...........','...........'],
+    ],
+    turret: [
+      ['.HHH.','HHHHH','HHGHH','.GGG.','.GGG.','.GGG.'],
+      ['.....','.HHH.','.HHH.','..G..','..G..','..G..'],
+    ],
+  },
+  {
+    id: 'light-v2-c', name: 'LIGHT C2 — COMPACT WEDGE', cls: 'LIGHT TANK',
+    hull: [
+      Array(8).fill('TT.......TT'),
+      ['TTHHEEEHHTT','TTHHHHHHHHT','TTHHHHHHHHT','TTHHHHHHHHT','TTHHHHHHHHT','TT.HHHHH.TT','TT..HHH..TT','TT...H...TT'],
+      ['...........','.TTHHHHHTT.','.TTHHCHHTT.','.TTHHCHHTT.','.TTHHHHHTT.','.TT.HHH.TT.','.TT..H..TT.','...........'],
+    ],
+    turret: [
+      ['.HHH.','HHHHH','HHGHH','.GGG.','.GGG.','.GGG.'],
+      ['.....','.HHH.','.HHH.','..G..','..G..','..G..'],
+    ],
+  },
+  {
+    id: 'super-v2-a', name: 'SUPER A2 — HEAVY WEDGE', cls: 'SUPER TANK',
+    hull: [
+      Array(12).fill('TT.........TT'),
+      ['TTHHEEEEEHHTT','TTHHHHHHHHHTT','TTHHHHHHHHHTT','TTHHHHHHHHHTT','TTHHHHHHHHHTT','TTHHHHHHHHHTT','TTHHHHHHHHHTT','TTHHHHHHHHHTT','TTHHHHHHHHHTT','TT.HHHHHHH.TT','TT..HHHHH..TT','TT...HHH...TT'],
+      ['.............','.TTHHHHHHHTT.','.TTHHHHHHHTT.','.TTHHHHHHHTT.','.TTHHHHHHHTT.','.TTHHHHHHHTT.','.TTHHHHHHHTT.','.TTHHHHHHHTT.','.TT.HHHHH.TT.','.TT..HHH..TT.','.TT...H...TT.','.............'],
+    ],
+    turret: [
+      ['.HHHH.','HHHHHH','HHGGHH','.HGGH.','.GGGG.','.GGGG.','.GGGG.'],
+      ['......','.HHHH.','.HGGH.','..GG..','..GG..','..GG..','..GG..'],
+    ],
+  },
+  {
+    id: 'super-v2-b', name: 'SUPER B2 — BULWARK', cls: 'SUPER TANK',
+    hull: [
+      Array(12).fill('TTT.........TTT'),
+      ['TTTHHEEEEEHHTTT','TTTHHHHHHHHHTTT','TTTHHHHHHHHHTTT','TTTHHHHHHHHHTTT','TTTHHHHHHHHHTTT','TTTHHHHHHHHHTTT','TTTHHHHHHHHHTTT','TTTHHHHHHHHHTTT','TTTHHHHHHHHHTTT','TTT.HHHHHHH.TTT','TTT..HHHHH..TTT','TTT...HHH...TTT'],
+      ['TTT.........TTT','.TTTHHHHHHHTTT.','.TTTHHHHHHHTTT.','.TTTHHHHHHHTTT.','.TTTHHHHHHHTTT.','.TTTHHHHHHHTTT.','.TTTHHHHHHHTTT.','.TTTHHHHHHHTTT.','.TTT.HHHHH.TTT.','.TTT..HHH..TTT.','.TTT...H...TTT.','TTT.........TTT'],
+      ['...............','...HHHHHHHHH...','...HHHHHHHHH...','....HHHHHHH....','.....HHHHH.....','......HHH......','...............','...............','...............','...............','...............','...............'],
+    ],
+    turret: [
+      ['.HHHHH.','HHHHHHH','HHGGGHH','.HGGGH.','..GGG..','..GGG..','..GGG..','..GGG..'],
+      ['.HHHHH.','HHHHHHH','HHGGGHH','.HGGGH.','..GGG..','..GGG..','..GGG..','..GGG..'],
+      ['..HHH..','..HHH..','..GGG..','..GGG..','..GGG..','..GGG..','..GGG..','..GGG..'],
+    ],
+  },
+  {
+    id: 'super-v2-c', name: 'SUPER C2 — SIEGE WEDGE', cls: 'SUPER TANK',
+    hull: [
+      Array(14).fill('TT.........TT'),
+      ['TTHHEEEEEHHTT','TTHHHHHHHHHTT','TTHHHHHHHHHTT','TTHHHHHHHHHTT','TTHHHHHHHHHTT','TTHHHHHHHHHTT','TTHHHHHHHHHTT','TTHHHHHHHHHTT','TTHHHHHHHHHTT','TTHHHHHHHHHTT','TTHHHHHHHHHTT','TT.HHHHHHH.TT','TT..HHHHH..TT','TT...HHH...TT'],
+      ['.............','.TTHHHHHHHTT.','.TTHHHHHHHTT.','.TTHHHHHHHTT.','.TTHHHHHHHTT.','.TTHHHHHHHTT.','.TTHHHHHHHTT.','.TTHHHHHHHTT.','.TTHHHHHHHTT.','.TTHHHHHHHTT.','.TT.HHHHH.TT.','.TT..HHH..TT.','.TT...H...TT.','.............'],
+    ],
+    turret: [
+      ['.HHHH.','HHHHHH','HHGGHH','.HGGH.','.GGGG.','.GGGG.','.GGGG.','.GGGG.','.GGGG.'],
+      ['......','.HHHH.','.HGGH.','..GG..','..GG..','..GG..','..GG..','..GG..','..GG..'],
+    ],
+  },
 ];
 
 function cellsOf(d) {
@@ -144,6 +219,60 @@ function renderTank(d, box) {
   ).join('\n');
 }
 
+function renderProfile(d, box, view) {
+  const cells = cellsOf(d);
+  const map = new Map();
+  for (const c of cells) {
+    const key = view === 'side' ? `${c.z},${c.y}` : `${c.x},${c.y}`;
+    const old = map.get(key);
+    if (!old) map.set(key, c);
+    else if (view === 'side') {
+      // hull/armor reads above the track silhouette in side profile
+      if (old.t === 'T' && c.t !== 'T') map.set(key, c);
+    } else if (c.z > old.z) map.set(key, c);
+  }
+  const list = [...map.values()];
+  const xs = list.map((c) => view === 'side' ? c.z : c.x);
+  const ys = list.map((c) => -c.y);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  const cols = maxX - minX + 1, rows = maxY - minY + 1;
+  const cell = Math.min((box.w - 50) / cols, (box.h - 55) / rows);
+  const ox = box.x + box.w / 2 - cols * cell / 2;
+  const oy = box.y + 45 + (box.h - 55) / 2 + rows * cell / 2;
+  const color = (t) => t === 'T' ? DIM : t === 'G' ? BRIGHT : GREEN;
+  return list.map((c) => {
+    const x = view === 'side' ? c.z : c.x;
+    const y = -c.y;
+    const px = ox + (x - minX) * cell;
+    const py = oy + (y - maxY) * cell;
+    return `<rect x="${px.toFixed(2)}" y="${py.toFixed(2)}" width="${(cell-1).toFixed(2)}" height="${(cell-1).toFixed(2)}" fill="#000" stroke="${color(c.t)}" stroke-width="1"/>`;
+  }).join('\n');
+}
+
+function profileSheet() {
+  const picks = [designs.find((d) => d.id === 'light-v2-a'), designs.find((d) => d.id === 'super-v2-a'), designs.find((d) => d.id === 'super-v2-b')];
+  const W = 1800, H = 1100;
+  const out = [`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`,
+    `<rect width="100%" height="100%" fill="#000"/>`,
+    `<style>text{font-family:monospace;fill:${GREEN}} .title{font-size:30px;letter-spacing:5px} .label{font-size:20px;letter-spacing:2px} .meta{font-size:14px;fill:#1d7a3a}</style>`,
+    `<text x="60" y="58" class="title">VECTORZONE — TANK REWORK PROFILES</text>`,
+    `<line x1="60" y1="78" x2="1740" y2="78" stroke="#1d7a3a"/>`,
+  ];
+  picks.forEach((d, i) => {
+    const x = 60 + i * 580;
+    out.push(`<rect x="${x}" y="105" width="540" height="430" fill="none" stroke="#0a3319"/>`);
+    out.push(`<text x="${x+25}" y="145" class="label">${d.name} — SIDE</text>`);
+    out.push(renderProfile(d, { x, y: 105, w: 540, h: 430 }, 'side'));
+    out.push(`<rect x="${x}" y="555" width="540" height="430" fill="none" stroke="#0a3319"/>`);
+    out.push(`<text x="${x+25}" y="595" class="label">${d.name} — FRONT</text>`);
+    out.push(renderProfile(d, { x, y: 555, w: 540, h: 430 }, 'front'));
+  });
+  out.push(`<text x="60" y="1065" class="meta">SIDE: HULL WEDGE / TRACK HEIGHT · FRONT: TRACK PODS / HULL WIDTH / TURRET</text>`);
+  out.push('</svg>');
+  writeFileSync('concepts/tank-profiles.svg', out.join('\n'));
+}
+
 function sheet(title, subset, filename) {
   const W = 1800, H = 1220;
   const parts = [`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`,
@@ -169,6 +298,10 @@ function sheet(title, subset, filename) {
 }
 
 sheet('VECTORZONE — LIGHT TANK CONCEPTS', designs.slice(0, 3), 'light-tank-concepts.svg');
-sheet('VECTORZONE — SUPER TANK CONCEPTS', designs.slice(3), 'super-tank-concepts.svg');
-sheet('VECTORZONE — TANK COMPARISON', designs, 'tank-concepts.svg');
-console.log('Wrote concepts/light-tank-concepts.svg, super-tank-concepts.svg, tank-concepts.svg');
+sheet('VECTORZONE — SUPER TANK CONCEPTS', designs.slice(3, 6), 'super-tank-concepts.svg');
+sheet('VECTORZONE — TANK COMPARISON', designs.slice(0, 6), 'tank-concepts.svg');
+sheet('VECTORZONE — LIGHT TANK REWORK', designs.slice(6, 9), 'light-tank-rework.svg');
+sheet('VECTORZONE — SUPER TANK REWORK', designs.slice(9, 12), 'super-tank-rework.svg');
+sheet('VECTORZONE — TANK REWORK COMPARISON', designs.slice(6, 12), 'tank-rework.svg');
+profileSheet();
+console.log('Wrote original and rework concept sheets.');
