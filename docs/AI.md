@@ -69,7 +69,7 @@ Everything above lives in the shared sim, seeded → identical on host and clien
 
 ### 5.1 Slow tank — the honest duel
 
-- **State machine**: `APPROACH` (seek preferred range, crude 3-ray whisker obstacle avoidance) → `ENGAGE` (strafe/orbit at range, aim with error, disciplined fire) → `REPOSITION` (stuck >1.5 s or LOS blocked >3 s → pick a new offset point) → back to `ENGAGE`.
+- **State machine**: `PATROL` (no contacts → waypoint movement + slow turret scan) → `INVESTIGATE` (ping/gunfire/proximity without LOS → drive to last-known position, never fire) → `ENGAGE` (visual confirmation → hold range, hull aim, fire) → repeat when target dies/contact expires. `REPOSITION` is stuck recovery only.
 - Direct, predictable, forgiving. The tutorial opponent that never stops being useful.
 
 ### 5.2 Missile — the airborne committed threat

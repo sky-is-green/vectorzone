@@ -1,15 +1,17 @@
 /**
- * Enemy AI (AI.md): faithful personalities, human-like imperfection.
- * Brains consume the SAME awareness model as the player radar and emit the
- * SAME TankCommand a player does. Knobs are data (AI.md §5.5).
+ * Enemy AI (AI.md): PATROL -> INVESTIGATE -> ENGAGE -> PATROL.
+ * Brains consume the shared awareness model and emit TankCommand.
+ * No contact = patrol. Contact without LOS = investigate, never fire.
+ * Visual confirmation = engage. Dead/expired target = repeat.
  */
-import { hasLos, targetable, type Known } from './awareness';
+import { hasLos, SIGHT_RANGE, targetable, type Known } from './awareness';
 import { BLOCK_SIZE, countType } from './grid';
 import { type Tank, type TankCommand } from './tank';
 import type { World } from './world';
 import type { V3 } from './raycast';
 
 export type AiKind = 'slow' | 'super';
+export type AiMode = 'patrol' | 'investigate' | 'engage' | 'reposition';
 
 export interface AiKnobs {
   speedMul: number;
@@ -18,37 +20,38 @@ export interface AiKnobs {
   err: number; // rad base aim cone
   cooldown: [number, number]; // s
   range: [number, number]; // preferred band, m
-  blockedPolicy: 'reposition' | 'shoot';
   turretShotChance: number; // deliberate rare turret aim vs normal hull aim
 }
 
 export const AI_KNOBS: Record<AiKind, AiKnobs> = {
   slow: {
     speedMul: 0.5, slew: 0.785, thinkTicks: 24, err: 0.105,
-    cooldown: [2.5, 3.5], range: [60, 100], blockedPolicy: 'reposition', turretShotChance: 0.1,
+    cooldown: [2.5, 3.5], range: [60, 100], turretShotChance: 0.1,
   },
   super: {
     speedMul: 1.2, slew: 2.094, thinkTicks: 15, err: 0.035,
-    cooldown: [1.4, 2.0], range: [40, 80], blockedPolicy: 'shoot', turretShotChance: 0.15,
+    cooldown: [1.4, 2.0], range: [40, 80], turretShotChance: 0.15,
   },
 };
 
 export interface AiBrain {
   kind: AiKind;
-  mode: 'approach' | 'engage' | 'reposition';
+  mode: AiMode;
   targetId: number | null;
-  /** Director-designated hunter: always prefers the player when known. */
+  /** Director-designated hunter: prefers the player when known. */
   playerTracker: boolean;
-  aim: { x: number; z: number; y: number } | null; // deliberate world aim point
+  aim: { x: number; z: number; y: number } | null;
   aimY: number;
-  strafe: 1 | -1;
+  patrolGoal: { x: number; z: number } | null;
+  investigateGoal: { x: number; z: number } | null;
+  searchCenter: { x: number; z: number } | null;
+  searchUntilTick: number;
+  reposition: { x: number; z: number } | null;
   nextThink: number;
   lastTargetSwitchTick: number;
-  blockedTicks: number;
   stuckTicks: number;
   lastShotTick: number;
   shotsAtContact: number;
-  reposition: { x: number; z: number } | null;
   lastX: number;
   lastZ: number;
   debug: { intent: V3 | null; los: boolean; err: number };
@@ -57,19 +60,21 @@ export interface AiBrain {
 export function createBrain(kind: AiKind, playerTracker = false): AiBrain {
   return {
     kind,
-    mode: 'approach',
+    mode: 'patrol',
     targetId: null,
     playerTracker,
     aim: null,
     aimY: 0.45,
-    strafe: 1,
+    patrolGoal: null,
+    investigateGoal: null,
+    searchCenter: null,
+    searchUntilTick: 0,
+    reposition: null,
     nextThink: 0,
     lastTargetSwitchTick: -9999,
-    blockedTicks: 0,
     stuckTicks: 0,
     lastShotTick: -9999,
     shotsAtContact: 0,
-    reposition: null,
     lastX: 0,
     lastZ: 0,
     debug: { intent: null, los: false, err: 0 },
@@ -85,10 +90,11 @@ const wrap = (a: number): number => {
   while (a < -Math.PI) a += Math.PI * 2;
   return a;
 };
+const dist2 = (a: { x: number; z: number }, b: { x: number; z: number }): number =>
+  Math.hypot(a.x - b.x, a.z - b.z);
 
-/** Pick a target with stickiness. Retain the current contact unless it
- * expires, the director tracker prefers the player, or a clearly fresher
- * contact appears after the minimum switch interval. */
+/** Pick a target with stickiness. The director tracker prefers the player;
+ * other AI prefer other tanks (FFA). Current contacts are retained briefly. */
 function pickTarget(w: World, t: Tank, brain: AiBrain): { id: number; k: Known } | null {
   const m = w.awareness.get(t.id);
   if (!m) return null;
@@ -110,123 +116,195 @@ function pickTarget(w: World, t: Tank, brain: AiBrain): { id: number; k: Known }
   return best;
 }
 
-export function thinkBrain(w: World, brain: AiBrain, t: Tank): TankCommand {
+function newPatrolGoal(w: World, t: Tank): { x: number; z: number } {
+  const a = w.rng.next() * Math.PI * 2;
+  const r = 45 + w.rng.next() * 65;
+  return { x: clamp(t.x + Math.sin(a) * r, -190, 190), z: clamp(t.z + Math.cos(a) * r, -190, 190) };
+}
+
+function newInvestigateGoal(w: World, center: { x: number; z: number }): { x: number; z: number } {
+  const a = w.rng.next() * Math.PI * 2;
+  const r = 18 + w.rng.next() * 22;
+  return { x: clamp(center.x + Math.sin(a) * r, -190, 190), z: clamp(center.z + Math.cos(a) * r, -190, 190) };
+}
+
+function chooseAimY(w: World, brain: AiBrain, targetId: number): void {
   const K = AI_KNOBS[brain.kind];
+  const chance = K.turretShotChance * (targetId === 0 ? 0.5 : 1);
+  brain.aimY = w.rng.next() < chance ? 1.2 : 0.45 + w.rng.next() * 0.12;
+}
+
+function easeAim(brain: AiBrain, x: number, z: number, y: number, blend: number): void {
+  brain.aim = {
+    x: brain.aim ? brain.aim.x + (x - brain.aim.x) * blend : x,
+    z: brain.aim ? brain.aim.z + (z - brain.aim.z) * blend : z,
+    y,
+  };
+}
+
+export function thinkBrain(w: World, brain: AiBrain, t: Tank): TankCommand {
   const cmd: TankCommand = { throttle: 0, turn: 0, turretYaw: 0, gunPitch: 0, fire: false };
-  if (w.tick < brain.nextThink) {
-    // between perception ticks: keep executing the last intent (stale data)
-    return execute(w, brain, t, cmd, K);
+  if (w.tick < brain.nextThink) return execute(w, brain, t, cmd);
+  brain.nextThink = w.tick + AI_KNOBS[brain.kind].thinkTicks;
+
+  // Stuck detection is measured over the whole perception interval, not every
+  // tick (low speed is not the same as no movement).
+  if (brain.mode !== 'engage') {
+    const moved = dist2(t, { x: brain.lastX, z: brain.lastZ });
+    brain.stuckTicks = moved < 0.5 ? brain.stuckTicks + AI_KNOBS[brain.kind].thinkTicks : 0;
   }
-  brain.nextThink = w.tick + K.thinkTicks;
+  brain.lastX = t.x;
+  brain.lastZ = t.z;
+  if (brain.stuckTicks > 180) {
+    brain.stuckTicks = 0;
+    brain.mode = 'reposition';
+    const a = w.rng.next() * Math.PI * 2;
+    brain.reposition = {
+      x: clamp(t.x + Math.sin(a) * 30, -190, 190),
+      z: clamp(t.z + Math.cos(a) * 30, -190, 190),
+    };
+  }
+
+  // A dead target is cleared immediately; the loop repeats from patrol or
+  // another known contact instead of staring at a wreck.
+  const previous = w.tanks.find((x) => x.id === brain.targetId);
+  if (brain.targetId !== null && (!previous || !previous.alive)) {
+    brain.targetId = null;
+    brain.aim = null;
+    brain.mode = 'patrol';
+    brain.patrolGoal = null;
+    brain.investigateGoal = null;
+    brain.searchCenter = null;
+    brain.searchUntilTick = 0;
+    brain.shotsAtContact = 0;
+  }
 
   const found = pickTarget(w, t, brain);
   if (!found) {
-    brain.mode = 'approach';
     brain.targetId = null;
     brain.aim = null;
-    brain.debug.intent = null;
-    return cmd; // patrol idle: no omniscient hunting
+    brain.mode = 'patrol';
+    brain.investigateGoal = null;
+    brain.searchCenter = null;
+    brain.searchUntilTick = 0;
+    if (!brain.patrolGoal || dist2(t, brain.patrolGoal) < 8) brain.patrolGoal = newPatrolGoal(w, t);
+    brain.debug.intent = [brain.patrolGoal.x, 0.8, brain.patrolGoal.z];
+    brain.debug.los = false;
+    return execute(w, brain, t, cmd);
   }
-  const contact = found.k;
+
   const switched = brain.targetId !== found.id;
   if (switched) brain.shotsAtContact = 0;
   brain.targetId = found.id;
+  const target = w.tanks.find((x) => x.id === found.id)!;
+  const contact = found.k;
+  const visual =
+    dist2(t, target) <= SIGHT_RANGE &&
+    hasLos(w, [t.x, 1.2, t.z], [target.x, 1.2, target.z]);
+  brain.debug.los = visual;
 
-  const d = Math.hypot(contact.x - t.x, contact.z - t.z);
-  const los = hasLos(w, [t.x, 1.2, t.z], [contact.x, 1.2, contact.z]);
-  brain.debug.los = los;
-  brain.blockedTicks = los ? 0 : brain.blockedTicks + K.thinkTicks;
-
-  if (brain.mode === 'reposition' && brain.reposition) {
-    if (Math.hypot(brain.reposition.x - t.x, brain.reposition.z - t.z) < 6) {
-      brain.mode = 'approach';
-      brain.reposition = null;
-    }
-  } else if (!los && brain.blockedTicks > 180) {
-    if (K.blockedPolicy === 'reposition') {
-      brain.mode = 'reposition';
-      const a = w.rng.next() * Math.PI * 2;
-      brain.reposition = {
-        x: clamp(contact.x + Math.sin(a) * 40, -190, 190),
-        z: clamp(contact.z + Math.cos(a) * 40, -190, 190),
-      };
-    }
-  } else if (brain.mode === 'engage') {
-    // hysteresis: leave only well outside the band; back off when too close
-    if (d > K.range[1] + 15) brain.mode = 'approach';
-    else if (d < K.range[0] - 15) {
-      brain.mode = 'reposition';
-      const away = Math.atan2(t.x - contact.x, t.z - contact.z);
-      brain.reposition = {
-        x: clamp(t.x + Math.sin(away) * 35, -190, 190),
-        z: clamp(t.z + Math.cos(away) * 35, -190, 190),
-      };
-    }
-  } else if (brain.mode === 'approach' && d < K.range[1] - 10) {
+  if (visual) {
     brain.mode = 'engage';
+    brain.investigateGoal = null;
+    brain.searchCenter = null;
+    brain.searchUntilTick = 0;
+    brain.reposition = null;
+    if (switched || brain.shotsAtContact === 0 || brain.shotsAtContact % 8 === 0) {
+      chooseAimY(w, brain, target.id);
+    }
+    easeAim(brain, target.x, target.z, brain.aimY, brain.aim ? 0.35 : 1);
+    brain.debug.intent = [target.x, target.z, brain.aimY];
+    return execute(w, brain, t, cmd);
   }
 
-  // Normally aim at the lower hull; deliberate turret shots are rare and
-  // half as likely against the player. Keep the choice stable for several shots.
-  if (switched || brain.shotsAtContact === 0 || brain.shotsAtContact % 8 === 0) {
-    const target = w.tanks.find((x) => x.id === found.id);
-    const chance = K.turretShotChance * (target?.id === 0 ? 0.5 : 1);
-    brain.aimY = w.rng.next() < chance ? 1.2 : 0.45 + w.rng.next() * 0.12;
+  // Information without visual confirmation: investigate the last-known
+  // position. Never fire from ping/gunfire/memory alone.
+  if (brain.mode !== 'investigate' && brain.mode !== 'reposition') {
+    brain.mode = 'investigate';
+    brain.searchCenter = { x: contact.x, z: contact.z };
+    brain.searchUntilTick = w.tick + 480; // up to 8 s search after contact
+    brain.investigateGoal = { x: contact.x, z: contact.z };
+    brain.reposition = null;
+  } else {
+    brain.searchCenter = { x: contact.x, z: contact.z };
+    if (!brain.investigateGoal || dist2(t, brain.investigateGoal) < 6) {
+      brain.investigateGoal = newInvestigateGoal(w, brain.searchCenter);
+    }
   }
-  const blend = brain.aim ? 0.35 : 1;
-  brain.aim = {
-    x: brain.aim ? brain.aim.x + (contact.x - brain.aim.x) * blend : contact.x,
-    z: brain.aim ? brain.aim.z + (contact.z - brain.aim.z) * blend : contact.z,
-    y: brain.aimY,
-  };
-  brain.debug.intent = [brain.aim.x, brain.aim.y, brain.aim.z];
-  return execute(w, brain, t, cmd, K);
+  if (w.tick > brain.searchUntilTick) {
+    brain.mode = 'patrol';
+    brain.targetId = null;
+    brain.aim = null;
+    brain.investigateGoal = null;
+    brain.searchCenter = null;
+    brain.patrolGoal = newPatrolGoal(w, t);
+    brain.debug.intent = [brain.patrolGoal.x, 0.8, brain.patrolGoal.z];
+    return execute(w, brain, t, cmd);
+  }
+  easeAim(brain, brain.investigateGoal.x, brain.investigateGoal.z, 0.8, brain.aim ? 0.25 : 1);
+  brain.debug.intent = [brain.investigateGoal.x, 0.8, brain.investigateGoal.z];
+  return execute(w, brain, t, cmd);
 }
 
-function execute(
-  w: World,
-  brain: AiBrain,
-  t: Tank,
-  cmd: TankCommand,
-  K: AiKnobs,
-): TankCommand {
+function execute(w: World, brain: AiBrain, t: Tank, cmd: TankCommand): TankCommand {
+  const K = AI_KNOBS[brain.kind];
+  const target = w.tanks.find((x) => x.id === brain.targetId);
+  if (brain.mode === 'engage' && (!target || !target.alive)) {
+    brain.mode = 'patrol';
+    brain.targetId = null;
+    brain.aim = null;
+    brain.patrolGoal = null;
+  }
+
   const turretDead = countType(t.turret, 'gun') === 0;
-  const goal =
-    brain.mode === 'reposition' && brain.reposition
-      ? brain.reposition
-      : brain.aim
-        ? turretDead
-          ? brain.aim
-          : orbitPoint(brain, t, brain.aim, K)
-        : null;
-  if (goal) {
-    const want = angTo(t, goal);
-    const dh = wrap(want - t.heading);
-    cmd.turn = Math.abs(dh) < 0.025 ? 0 : clamp(dh * 1.6, -1, 1);
-    cmd.throttle = turretDead
-      ? 1
-      : Math.abs(dh) > 1.1
-        ? 0.15
-        : brain.mode === 'engage'
-          ? 0.35
-          : 0.85;
-    // stuck = commanded to move but position didn't change (not accel ramp)
-    const moved = Math.hypot(t.x - brain.lastX, t.z - brain.lastZ);
-    if (cmd.throttle > 0 && moved < 0.02) brain.stuckTicks += K.thinkTicks;
-    else brain.stuckTicks = 0;
-    brain.lastX = t.x;
-    brain.lastZ = t.z;
-    if (brain.stuckTicks > 90) {
-      brain.stuckTicks = 0;
-      brain.mode = 'reposition';
-      const a = w.rng.next() * Math.PI * 2;
-      brain.reposition = {
-        x: clamp(t.x + Math.sin(a) * 30, -190, 190),
-        z: clamp(t.z + Math.cos(a) * 30, -190, 190),
-      };
+  let goal: { x: number; z: number } | null = null;
+  let throttle = 0;
+
+  if (turretDead) {
+    // doomed tank charges its last known target/contact instead of wandering
+    goal = brain.aim ?? brain.investigateGoal ?? brain.patrolGoal;
+    throttle = 1;
+  } else if (brain.mode === 'patrol') {
+    if (!brain.patrolGoal || dist2(t, brain.patrolGoal) < 8) brain.patrolGoal = newPatrolGoal(w, t);
+    goal = brain.patrolGoal;
+    throttle = 0.55;
+  } else if (brain.mode === 'investigate') {
+    goal = brain.investigateGoal;
+    throttle = 0.7;
+  } else if (brain.mode === 'reposition') {
+    goal = brain.reposition;
+    throttle = 0.75;
+    if (goal && dist2(t, goal) < 6) {
+      brain.reposition = null;
+      brain.mode = brain.targetId ? 'investigate' : 'patrol';
+    }
+  } else if (brain.mode === 'engage' && target) {
+    const d = dist2(t, target);
+    // Hold a range band instead of orbiting a fixed point (the old wobble).
+    if (d > K.range[1] + 10) {
+      goal = target;
+      throttle = 0.6;
+    } else if (d < K.range[0] - 10) {
+      const away = Math.atan2(t.x - target.x, t.z - target.z);
+      goal = { x: clamp(t.x + Math.sin(away) * 25, -190, 190), z: clamp(t.z + Math.cos(away) * 25, -190, 190) };
+      throttle = 0.5;
     }
   }
-  if (turretDead) return cmd; // charge the target during self-destruct countdown
+
+  if (goal) {
+    const dh = wrap(angTo(t, goal) - t.heading);
+    cmd.turn = Math.abs(dh) < 0.025 ? 0 : clamp(dh * 1.6, -1, 1);
+    cmd.throttle = Math.abs(dh) > 1.1 ? Math.min(throttle, 0.2) : throttle;
+  }
+
+  if (turretDead) return cmd;
+
+  if (brain.mode === 'patrol') {
+    // slow scan while moving; deterministic, no target required
+    cmd.turretYaw = Math.sin(w.tick * 0.01 + t.id) * 0.35;
+    return cmd;
+  }
+
   if (brain.aim) {
     const wantYaw = wrap(angTo(t, brain.aim) - t.heading);
     const dYaw = wrap(wantYaw - t.turretYaw);
@@ -236,36 +314,17 @@ function execute(
     const wantPitch = Math.atan2(brain.aim.y - muzzleY, d);
     cmd.gunPitch = clamp((wantPitch - t.gunPitch) * 3, -1, 1);
 
-    const aligned = Math.abs(dYaw) < 0.1;
-    const inRange = d < K.range[1] + 40;
-    const losOk = brain.debug.los || K.blockedPolicy === 'shoot';
-    if (aligned && inRange && losOk && t.cooldown === 0 && brain.mode !== 'reposition') {
-      // human-like error: cone widens with range; first shot ranges wide
+    // Fire ONLY with current visual confirmation, alignment, range and cooldown.
+    if (brain.mode === 'engage' && brain.debug.los && Math.abs(dYaw) < 0.1 && d < K.range[1] + 40 && t.cooldown === 0) {
       const widening = 1 + d / 100;
       const ranging = brain.shotsAtContact === 0 ? 2 : 1;
       const err = K.err * widening * ranging;
       brain.debug.err = err;
-      const jitter = (w.rng.next() - 0.5) * 2 * err;
-      // apply jitter as a turret offset for this shot only
-      t.turretYaw += jitter;
+      t.turretYaw += (w.rng.next() - 0.5) * 2 * err;
       cmd.fire = true;
       brain.shotsAtContact++;
       brain.lastShotTick = w.tick;
-      // cooldown is charged by stepWorld when the shot actually fires
     }
   }
   return cmd;
-}
-
-function orbitPoint(
-  brain: AiBrain,
-  t: Tank,
-  aim: { x: number; z: number },
-  K: AiKnobs,
-): { x: number; z: number } {
-  if (brain.mode !== 'engage') return aim;
-  // strafe around the contact at the preferred band
-  const a = angTo(aim, t) + brain.strafe * 0.5;
-  const r = (K.range[0] + K.range[1]) / 2;
-  return { x: aim.x + Math.sin(a) * r, z: aim.z + Math.cos(a) * r };
 }

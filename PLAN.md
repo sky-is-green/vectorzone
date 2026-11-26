@@ -134,6 +134,7 @@ Full design in **[`docs/AI.md`](docs/AI.md)**. Summary:
 - AI obeys the same physics and block damage as players; lava, crush, and ion storms affect it too.
 - Four respawning light tanks are maintained in every mode; non-trackers fight FFA, exactly one tracks the player. Supertank hunters spawn at ~2.5 min then every 2–3 min. Airborne missiles appear every 25–55 s with limited-turn guidance and player lock alerts. The bomber crosses every mode every 2 min — targeted path, minor corrections, generous hitbox, path-denial bombs.
 - AI is just another producer of `TankCommand` in the shared sim → host-authoritative multiplayer needs zero extra AI netcode.
+- **Behavior loop**: `PATROL → INVESTIGATE → ENGAGE → PATROL`. No contacts means waypoint patrol; contacts without LOS mean investigate without firing; visual confirmation means engage; dead/expired targets restart the loop.
 
 ### 5.5 Radar & awareness — silence is stealth
 

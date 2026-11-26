@@ -3,6 +3,7 @@ import { createWorld, stepWorld } from './world';
 import { createEnemyTank, type TankCommand } from './tank';
 import { createBrain, thinkBrain } from './ai';
 import { getCell, setCell } from './grid';
+import { makeStructure } from './structure';
 import { SELF_DESTRUCT_TICKS } from './combat';
 
 const N: TankCommand = { throttle: 0, turn: 0, turretYaw: 0, gunPitch: 0, fire: false };
@@ -53,18 +54,43 @@ describe('AI aim & hysteresis', () => {
     expect(cmd.gunPitch).toBeLessThan(0);
   });
 
-  it('uses hysteresis at the edge of the preferred band', () => {
-    const w = duel(85, 'super'); // just beyond high=80, inside exit margin
+  it('holds a stable range band instead of flipping movement at the fringe', () => {
+    const w = duel(85, 'super'); // just beyond high=80, inside hold margin
     const brain = w.brains.get(1)!;
     brain.mode = 'engage';
-    thinkBrain(w, brain, w.tanks[1]);
+    const near = thinkBrain(w, brain, w.tanks[1]);
     expect(brain.mode).toBe('engage');
+    expect(near.throttle).toBe(0); // inside band: stop and fight
 
-    w.tanks[1].z = 101; // well beyond high+15
+    w.tanks[1].z = 101; // well beyond high+10
     w.awareness.get(1)!.set(0, { x: 0, z: 0, heading: 0, turretYaw: 0, tick: w.tick, source: 'los' });
     brain.nextThink = 0;
+    const far = thinkBrain(w, brain, w.tanks[1]);
+    expect(brain.mode).toBe('engage');
+    expect(far.throttle).toBeGreaterThan(0); // close the distance
+  });
+
+  it('investigates ping information without firing until visual confirmation', () => {
+    const w = duel(70, 'slow');
+    w.structures.push(makeStructure(600, 'tower', 0, 35));
+    w.awareness.get(1)!.set(0, { x: 0, z: 0, heading: 0, turretYaw: 0, tick: w.tick, source: 'ping' });
+    const cmd = thinkBrain(w, w.brains.get(1)!, w.tanks[1]);
+    expect(w.brains.get(1)!.mode).toBe('investigate');
+    expect(cmd.throttle).toBeGreaterThan(0);
+    expect(cmd.fire).toBe(false);
+  });
+
+  it('returns to patrol after its target is destroyed', () => {
+    const w = duel(70, 'slow');
+    const brain = w.brains.get(1)!;
     thinkBrain(w, brain, w.tanks[1]);
-    expect(brain.mode).toBe('approach');
+    expect(brain.mode).toBe('engage');
+    w.tanks[0].alive = false;
+    brain.nextThink = 0;
+    thinkBrain(w, brain, w.tanks[1]);
+    expect(brain.mode).toBe('patrol');
+    expect(brain.targetId).toBeNull();
+    expect(brain.patrolGoal).not.toBeNull();
   });
 
   it('keeps its current target instead of flicking to an equally fresh contact', () => {

@@ -97,6 +97,7 @@ describe('awareness rules (RADAR.md)', () => {
   it('awareness records turret angle for radar orientation', () => {
     const w = twoTanks(20);
     w.tanks[1].turretYaw = 0.7;
+    w.brains.delete(1); // freeze turret so awareness records the exact angle
     for (let i = 0; i < 6; i++) stepWorld(w);
     expect(w.awareness.get(0)?.get(1)?.turretYaw).toBeCloseTo(0.7);
   });

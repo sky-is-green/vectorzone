@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { createWorld, stepWorld, hashWorld } from './world';
 import { createEnemyTank, type TankCommand } from './tank';
 import { createBrain, thinkBrain, AI_KNOBS } from './ai';
-import { stepAwareness } from './awareness';
 import { makeStructure } from './structure';
 import { BOMBER_PERIOD, TELEGRAPH_TICKS } from './director';
 
@@ -23,12 +22,13 @@ function duel(dist: number, kind: 'slow' | 'super' = 'slow') {
 }
 
 describe('AI imperfection (AI.md)', () => {
-  it('no contacts → no omniscient hunting (commands neutral)', () => {
+  it('no contacts → patrols instead of stopping or omnisciently hunting', () => {
     const w = duel(60);
     w.awareness.clear();
     const cmd = thinkBrain(w, w.brains.get(1)!, w.tanks[1]);
     expect(cmd.fire).toBe(false);
-    expect(cmd.throttle).toBe(0);
+    expect(cmd.throttle).toBeGreaterThan(0);
+    expect(w.brains.get(1)!.mode).toBe('patrol');
   });
 
   it('engages a known contact: fires with cooldown discipline and nonzero error', () => {
@@ -48,34 +48,32 @@ describe('AI imperfection (AI.md)', () => {
     expect(errs.some((e) => e > 0)).toBe(true);
   });
 
-  it('blocked LOS: slow tank repositions, supertank shoots through cover', () => {
-    // think-level isolation: no movement, so the block persists
+  it('blocked LOS: both types investigate and never fire through cover', () => {
     const ws = duel(70, 'slow');
     ws.structures.push(makeWall());
-    stepAwareness(ws);
     const bs = ws.brains.get(1)!;
     for (let i = 0; i < 40; i++) {
       ws.tick += 24;
       ws.events = [];
       ws.awareness.set(1, new Map([[0, { x: 0, z: 0, heading: 0, turretYaw: 0, tick: ws.tick, source: 'ping' }]]));
-      thinkBrain(ws, bs, ws.tanks[1]);
+      bs.nextThink = 0;
+      const cmd = thinkBrain(ws, bs, ws.tanks[1]);
+      expect(cmd.fire).toBe(false);
     }
-    expect(bs.mode).toBe('reposition');
+    expect(['investigate', 'reposition']).toContain(bs.mode);
 
     const wu = duel(70, 'super');
     wu.structures.push(makeWall());
-    stepAwareness(wu);
     const bu = wu.brains.get(1)!;
-    let superShots = 0;
     for (let i = 0; i < 40; i++) {
       wu.tick += 15;
       wu.events = [];
       wu.awareness.set(1, new Map([[0, { x: 0, z: 0, heading: 0, turretYaw: 0, tick: wu.tick, source: 'ping' }]]));
+      bu.nextThink = 0;
       const cmd = thinkBrain(wu, bu, wu.tanks[1]);
-      if (cmd.fire) superShots++;
-      wu.tanks[1].cooldown = 0; // isolate policy from cooldown discipline
+      expect(cmd.fire).toBe(false);
     }
-    expect(superShots).toBeGreaterThan(0);
+    expect(['investigate', 'reposition']).toContain(bu.mode);
   });
 
   it('determinism: same seed + same script → identical hash with AI active', () => {
