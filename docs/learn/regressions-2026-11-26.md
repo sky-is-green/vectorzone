@@ -27,11 +27,18 @@ enemy turret orientation was not tracked.
    Added `turretYaw` to awareness data and the HUD state, and enemy blips now
    draw a gun-direction tick at `hull heading + turret yaw`.
 
+6. **Minimap turret pointer still looked reversed** — the long red line was a
+   cosmetic time-driven radar sweep, unrelated to the turret, so while the gun
+   turned left the sweep kept drifting clockwise. Replaced it with a
+   **turret-aligned pointer**; both the long line and centre tick now follow
+   turret yaw. `radarPointer()` has a sign regression test, and zoomed browser
+   captures confirm ArrowLeft → upper-left, ArrowRight → upper-right.
+
 ## Verification
 
-100 tests (new: turret sign, enemy colour, fat-line segment integrity,
-missile reaches target, awareness turret angle). Browser: zero console errors,
-scanner 780/0 diagonals, ArrowLeft negative yaw, guided missile hit, red radar
-triangles with turret ticks, 52 draw calls, 150.5 KB gz.
+101 tests (new: turret sign, enemy colour, fat-line segment integrity,
+missile reaches target, awareness turret angle, radar pointer sign). Browser:
+zero console errors, scanner 780/0 diagonals, ArrowLeft negative yaw, guided
+missile hit, red radar triangles with turret ticks, 52 draw calls, 150.5 KB gz.
 
 Human feel confirmation remains open in F5.

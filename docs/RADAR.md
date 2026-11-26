@@ -51,7 +51,9 @@ The original radar showed every enemy at all times. Ours turns information into 
   supertank = brightest/larger red triangle; bomber = actual-position flight-heading
   triangle (only while its blip lives); missiles = orange arrows, player locks
   pulsing red; scanner = blue diamond; co-op allies = green.
-- **Rotating sweep line** — cosmetic phosphor flavor; blip lifetimes are governed by the information rules, not the sweep.
+- **Turret-aligned pointer**: the long scope line and the short centre tick
+  both follow turret yaw (a cosmetic time-driven sweep was removed because it
+  appeared to move opposite the gun).
 - Blips flash bright then **decay like phosphor**; ion storm fills the scope with animated static.
 
 ## 5. Symmetry: AI knows exactly what you know

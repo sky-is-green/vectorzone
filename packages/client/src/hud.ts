@@ -5,7 +5,7 @@
  */
 import type { Known } from '@vectorzone/sim';
 import type { Palette } from './palette';
-import { projectRadar, relativeHeading } from './radar';
+import { projectRadar, radarPointer, relativeHeading } from './radar';
 
 export interface HudMissile {
   id: number;
@@ -119,11 +119,14 @@ export function createHud(): {
     ctx.beginPath();
     ctx.arc(cx, cy, (RADAR_R * 30) / RADAR_RANGE, 0, Math.PI * 2);
     ctx.stroke();
-    const sweep = s.tick * 0.06;
+    // turret-aligned pointer (was a cosmetic time-driven sweep that appeared
+    // to move opposite the gun)
+    const sweep = s.turretYaw;
+    const pointer = radarPointer(sweep, RADAR_R);
     ctx.strokeStyle = hud + '55';
     ctx.beginPath();
     ctx.moveTo(cx, cy);
-    ctx.lineTo(cx + Math.sin(sweep) * RADAR_R, cy - Math.cos(sweep) * RADAR_R);
+    ctx.lineTo(cx + pointer.x, cy + pointer.y);
     ctx.stroke();
 
     const place = (x: number, z: number) => {
@@ -190,10 +193,11 @@ export function createHud(): {
 
     // own hull arrow + turret tick
     triangle(cx, cy, 0, 6, P.worldCss);
+    const turretTick = radarPointer(s.turretYaw, 11);
     ctx.strokeStyle = hud;
     ctx.beginPath();
     ctx.moveTo(cx, cy);
-    ctx.lineTo(cx + Math.sin(s.turretYaw) * 11, cy - Math.cos(s.turretYaw) * 11);
+    ctx.lineTo(cx + turretTick.x, cy + turretTick.y);
     ctx.stroke();
 
     // score / lives / clock

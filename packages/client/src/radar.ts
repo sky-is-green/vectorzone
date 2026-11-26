@@ -29,3 +29,8 @@ export function relativeHeading(heading: number, ownHeading: number): number {
 export function headingFromDir(x: number, z: number): number {
   return Math.atan2(x, z);
 }
+
+/** Radar pointer/tick endpoint relative to scope centre; 0 = up. */
+export function radarPointer(yaw: number, length: number): { x: number; y: number } {
+  return { x: Math.sin(yaw) * length, y: -Math.cos(yaw) * length };
+}

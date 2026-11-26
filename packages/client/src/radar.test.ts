@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { headingFromDir, projectRadar, relativeHeading } from './radar';
+import { headingFromDir, projectRadar, radarPointer, relativeHeading } from './radar';
 
 describe('radar projection + orientation', () => {
   it('forward contact points up', () => {
@@ -30,5 +30,12 @@ describe('radar projection + orientation', () => {
     expect(relativeHeading(Math.PI / 2, 0)).toBeCloseTo(Math.PI / 2);
     expect(headingFromDir(1, 0)).toBeCloseTo(Math.PI / 2);
     expect(headingFromDir(0, 1)).toBeCloseTo(0);
+  });
+
+  it('turret pointer follows yaw sign: left is left, right is right', () => {
+    expect(radarPointer(-0.7, 10).x).toBeLessThan(0);
+    expect(radarPointer(0.7, 10).x).toBeGreaterThan(0);
+    expect(radarPointer(0, 10).x).toBeCloseTo(0);
+    expect(radarPointer(0, 10).y).toBeLessThan(0);
   });
 });
