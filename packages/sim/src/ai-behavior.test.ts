@@ -174,6 +174,44 @@ describe('AI aim & hysteresis', () => {
     expect(w.threats.get(1)?.from).toBe(0);
   });
 
+  it('locks onto the closest attacker and flees to cover when outnumbered', () => {
+    const w = duel(70, 'slow');
+    const nearAttacker = createEnemyTank(2, 'slow', 40, 40, 0);
+    const farAttacker = createEnemyTank(3, 'slow', 50, 0, 0);
+    nearAttacker.spawnTick = -1000;
+    farAttacker.spawnTick = -1000;
+    w.tanks.push(nearAttacker, farAttacker);
+    w.structures = [makeStructure(700, 'wall', 10, 50)];
+    const brain = w.brains.get(1)!;
+    brain.targetId = null;
+    brain.lastTargetSwitchTick = -9999;
+    w.awareness.get(1)!.set(2, { x: 40, z: 40, heading: 0, turretYaw: 0, tick: w.tick, source: 'ping' });
+    w.awareness.get(1)!.set(3, { x: 50, z: 0, heading: 0, turretYaw: 0, tick: w.tick, source: 'ping' });
+    w.targeters.set(1, new Set([0, 2, 3]));
+    const cmd = thinkBrain(w, brain, w.tanks[1]);
+    expect(brain.targetId).toBe(2);
+    expect(brain.debug.outnumbered).toBe(true);
+    expect(brain.fleeGoal).not.toBeNull();
+    expect(cmd.throttle).toBeGreaterThan(0.5);
+  });
+
+  it('breaks away from the closest attacker when outnumbered with no cover', () => {
+    const w = duel(70, 'slow');
+    const attacker = createEnemyTank(2, 'slow', 40, 40, 0);
+    attacker.spawnTick = -1000;
+    w.tanks.push(attacker);
+    w.structures = [];
+    const brain = w.brains.get(1)!;
+    brain.targetId = null;
+    brain.lastTargetSwitchTick = -9999;
+    w.awareness.get(1)!.set(2, { x: 40, z: 40, heading: 0, turretYaw: 0, tick: w.tick, source: 'ping' });
+    w.targeters.set(1, new Set([0, 2]));
+    const cmd = thinkBrain(w, brain, w.tanks[1]);
+    expect(brain.targetId).toBe(2);
+    expect(brain.fleeGoal).toBeNull();
+    expect(cmd.throttle).toBeGreaterThan(0);
+  });
+
   it('investigates ping information without firing until visual confirmation', () => {
     const w = duel(70, 'slow');
     w.structures.push(makeStructure(600, 'tower', 0, 35));

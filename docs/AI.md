@@ -71,6 +71,9 @@ Everything above lives in the shared sim, seeded → identical on host and clien
 
 - **State machine**: `PATROL` (no contacts → waypoint movement + slow turret scan) → `INVESTIGATE` (ping/gunfire/proximity without LOS → drive to last-known position, never fire) → `ENGAGE` (visual confirmation → seek cover, or circle if none; advance/retreat to maintain range; fire while moving) → repeat when target dies/contact expires. `REPOSITION` is stuck recovery only.
 - **Retaliation**: a tank hit by an attacker prioritizes that attacker for ~6 s, then returns to normal target selection.
+- **Outnumbered**: when 2+ enemies target it, the AI locks onto the closest
+  attacker, keeps firing while fleeing to cover, and stops switching targets.
+  No cover → break away from the closest attacker.
 - Direct, predictable, forgiving. The tutorial opponent that never stops being useful.
 
 ### 5.2 Missile — the airborne committed threat

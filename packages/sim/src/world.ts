@@ -76,6 +76,7 @@ export interface World {
   awareness: Map<number, Map<number, Known>>;
   brains: Map<number, AiBrain>;
   threats: Map<number, { tick: number; from: number }>;
+  targeters: Map<number, Set<number>>;
   missiles: Missile[];
   bomber: Bomber | null;
   telegraphs: Telegraph[];
@@ -121,6 +122,7 @@ export function createWorld(seed: number, map: MapId = 'classic'): World {
     awareness: new Map(),
     brains: new Map(),
     threats: new Map(),
+    targeters: new Map(),
     missiles: [],
     bomber: null,
     telegraphs: [],
@@ -432,6 +434,27 @@ function stepChunks(w: World): void {
   w.events.push({ kind: 'rubbleChanged' });
 }
 
+function updateTargeters(w: World): void {
+  const map = new Map<number, Set<number>>();
+  const add = (targetId: number, attackerId: number) => {
+    let set = map.get(targetId);
+    if (!set) {
+      set = new Set();
+      map.set(targetId, set);
+    }
+    set.add(attackerId);
+  };
+  for (const t of w.tanks) {
+    if (!t.alive) continue;
+    const brain = w.brains.get(t.id);
+    if (brain?.targetId !== null && brain?.targetId !== undefined) add(brain.targetId, t.id);
+  }
+  for (const [targetId, threat] of w.threats) {
+    if (w.tick - threat.tick < 180) add(targetId, threat.from);
+  }
+  w.targeters = map;
+}
+
 // --- the tick ---------------------------------------------------------------
 
 export function stepWorld(w: World, commands: TankCommand[] = []): void {
@@ -552,6 +575,7 @@ export function stepWorld(w: World, commands: TankCommand[] = []): void {
   stepSelfDestruct(w, damaged);
   stepChunks(w);
   stepAwareness(w);
+  updateTargeters(w);
 
   // scoring from events (player kills/credits only)
   for (const ev of w.events) {
@@ -604,6 +628,7 @@ export function hashWorld(w: World): string {
     `lava${w.lavaPools.length}`,
     `fen${w.fences.filter((f) => fenceAlive(w, f)).length}`,
     `threat${[...w.threats.entries()].sort((a, b) => a[0] - b[0]).map(([id, v]) => `${id}:${v.tick}:${v.from}`).join(',')}`,
+    `targeters${[...w.targeters.entries()].sort((a, b) => a[0] - b[0]).map(([id, set]) => `${id}:${[...set].sort((a, b) => a - b).join('.')}`).join(',')}`,
     `spawn${w.nextSpawnTick}:${w.nextSuperTick}:${w.nextMissileTick}`,
   );
   for (const m of w.missiles) {
