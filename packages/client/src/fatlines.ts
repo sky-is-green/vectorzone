@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
+import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 
 const materials: LineMaterial[] = [];
 
@@ -32,7 +32,7 @@ function positionsOf(g: THREE.BufferGeometry): number[] | Float32Array {
 }
 
 export function makeFatLines(g: THREE.BufferGeometry, mat: LineMaterial): LineSegments2 {
-  const lg = new LineGeometry();
+  const lg = new LineSegmentsGeometry();
   const pos = positionsOf(g);
   if (pos.length < 6) {
     lg.setPositions([0, 0, 0, 0, 0, 0]);
@@ -46,7 +46,7 @@ export function makeFatLines(g: THREE.BufferGeometry, mat: LineMaterial): LineSe
 }
 
 export function makeFatLinesFromPositions(pos: number[] | Float32Array, mat: LineMaterial): LineSegments2 {
-  const lg = new LineGeometry();
+  const lg = new LineSegmentsGeometry();
   lg.setPositions(pos);
   const lines = new LineSegments2(lg, mat);
   lines.frustumCulled = false;

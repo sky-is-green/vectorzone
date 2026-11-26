@@ -373,6 +373,7 @@ const debug: { cam: { p: [number, number, number]; l: [number, number, number] }
   },
   post,
   scene,
+  command: readCommand,
   // numeric visual verification: render scene (or post chain) into a small
   // target and return lit-pixel count + mean color + row variance
   sample: (usePost: boolean) => {
@@ -889,8 +890,10 @@ function frame(now: number): void {
   // HUD: band + radar + reticle + alerts
   const superIds = new Set<number>();
   const tankHeadings = new Map<number, number>();
+  const tankTurrets = new Map<number, number>();
   for (const t of world.tanks) {
     tankHeadings.set(t.id, t.heading);
+    tankTurrets.set(t.id, t.turretYaw);
     const b = world.brains.get(t.id);
     if (b?.kind === 'super') superIds.add(t.id);
   }
@@ -903,6 +906,7 @@ function frame(now: number): void {
     z: tank.z,
     known: world.awareness.get(0),
     tankHeadings,
+    tankTurrets,
     missiles: world.missiles.map((m) => ({
       id: m.id,
       x: m.pos[0],

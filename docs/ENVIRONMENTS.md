@@ -149,9 +149,11 @@ Arenas are JSON-ish layouts (object placements + block grids + event profile), s
 
 ## 7. Performance budget (environment share)
 
-- **Line hierarchy** (`Line2`, real pixel widths): floor 1 px (thinnest), tanks
-  2.4 px (thickest), structures 1.4 px, aircraft/missiles 1.8 px, rubble 1 px,
-  horizon 1.1–1.2 px, trajectory 0.9 px.
+- **Line hierarchy** (`Line2` / `LineSegmentsGeometry`, real pixel widths): floor
+  1 px (thinnest), tanks 2.4 px (thickest), structures 1.4 px, aircraft/missiles
+  1.8 px, rubble 1 px, horizon 1.1–1.2 px, trajectory 0.9 px. Independent block
+  edges must use `LineSegmentsGeometry`; `LineGeometry` connects them into a
+  polyline and creates spurious diagonal lines.
 - Global line-particle pool: **1,024 segments**, shared by smoke, sparks, ash,
   embers, debris. Lava rings are one pooled thick-line mesh, not per-frame particles.
 - ≤ ~24 block structures per arena, each merged to **2 draw calls** (faces + edges); rubble merged arena-wide into 1–2 more.

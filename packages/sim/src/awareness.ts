@@ -21,6 +21,7 @@ export interface Known {
   x: number;
   z: number;
   heading: number;
+  turretYaw: number;
   tick: number;
   source: ContactSource;
 }
@@ -96,7 +97,7 @@ function refresh(w: World, observer: Tank, t: Tank, source: ContactSource): void
     m = new Map();
     w.awareness.set(observer.id, m);
   }
-  m.set(t.id, { x: t.x, z: t.z, heading: t.heading, tick: w.tick, source });
+  m.set(t.id, { x: t.x, z: t.z, heading: t.heading, turretYaw: t.turretYaw, tick: w.tick, source });
 }
 
 export function stepAwareness(w: World): void {

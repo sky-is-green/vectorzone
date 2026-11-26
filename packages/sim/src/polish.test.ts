@@ -32,8 +32,8 @@ describe('polish: four AI + FFA + player hunter', () => {
     const ai = w.tanks.find((t) => t.id !== 0 && t.alive && !w.brains.get(t.id)!.playerTracker)!;
     const other = w.tanks.find((t) => t.id !== 0 && t.id !== ai.id && t.alive)!;
     w.awareness.set(ai.id, new Map([
-      [0, { x: w.tanks[0].x, z: w.tanks[0].z, heading: 0, tick: 1, source: 'ping' }],
-      [other.id, { x: other.x, z: other.z, heading: other.heading, tick: w.tick, source: 'ping' }],
+      [0, { x: w.tanks[0].x, z: w.tanks[0].z, heading: 0, turretYaw: 0, tick: 1, source: 'ping' }],
+      [other.id, { x: other.x, z: other.z, heading: other.heading, turretYaw: other.turretYaw, tick: w.tick, source: 'ping' }],
     ]));
     thinkBrain(w, w.brains.get(ai.id)!, ai);
     expect(w.brains.get(ai.id)!.targetId).toBe(other.id);
@@ -65,6 +65,28 @@ describe('polish: airborne guided missiles', () => {
       for (const m of w.missiles) expect(m.pos[1]).toBeGreaterThan(8);
     }
     expect(lock).toBe(true);
+  });
+
+  it('a guided missile reaches a stationary target before expiring', () => {
+    const w = quietWorld();
+    w.nextSpawnTick = 1e9;
+    w.nextMissileTick = 1;
+    stepWorld(w, [N]);
+    const m = w.missiles[0];
+    expect(m?.tracking).toBe(true);
+    let minDistance = Infinity;
+    let hit = false;
+    for (let i = 0; i < 1200; i++) {
+      stepWorld(w, [N]);
+      const live = w.missiles.find((x) => x.id === m.id);
+      if (!live) {
+        hit = w.events.some((e) => e.kind === 'explosion' && e.source === 'missile');
+        break;
+      }
+      minDistance = Math.min(minDistance, Math.hypot(live.pos[0] - w.tanks[0].x, live.pos[2] - w.tanks[0].z));
+    }
+    expect(minDistance).toBeLessThan(3);
+    expect(hit).toBe(true);
   });
 
   it('guided missiles turn slowly enough to dodge', () => {

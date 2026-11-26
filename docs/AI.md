@@ -71,7 +71,8 @@ Everything above lives in the shared sim, seeded → identical on host and clien
 - Spawns at the arena edge **11–16 m above ground**, visibly missile-shaped
   (body, nose, swept fins, exhaust), and flies above the arena before diving.
 - ~60% are guided: they track a tank with a deliberately low **0.45 rad/s**
-  turn rate, so a moving tank can escape. The rest fly straight.
+  turn rate, so a moving tank can escape. The rest fly straight. Lifetime is
+  20 s so a 150 m approach can actually reach its target.
 - A player-targeted missile emits a **MISSILE LOCK** alert and is drawn on the
   minimap as a pulsing red arrow. All live missiles appear as orange arrows.
 - Shoot down for points; ground/tank impact produces a real explosion.

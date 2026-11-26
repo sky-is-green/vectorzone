@@ -8,6 +8,8 @@ const N: TankCommand = { throttle: 0, turn: 0, turretYaw: 0, gunPitch: 0, fire: 
 function idleWorld() {
   const w = createWorld(3);
   w.nextSpawnTick = 1e9;
+  w.nextSuperTick = 1e9;
+  w.nextMissileTick = 1e9;
   w.nextBomberTick = 1e9;
   return w;
 }

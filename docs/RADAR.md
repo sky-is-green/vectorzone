@@ -46,8 +46,9 @@ The original radar showed every enemy at all times. Ours turns information into 
 - **Line-of-fire sight** (user direction 2026-11-25): a dim trajectory line from the muzzle to the predicted first impact (grid / obstacle / ground), with an impact cross — makes long-range and elevated shots readable before firing. Canvas 2D — light, crisp, no extra three.js scene needed.
 - **Faint inner ring marks the 30 m sense radius**, so the player always understands what the radar can and can't see.
 - **Radar range ~200 m**; contacts beyond it clamp to the rim (direction preserved, distance lost).
-- **Blip taxonomy**: enemy tanks = heading triangles using **live hull heading**;
-  hunter supertank = larger triangle; bomber = actual-position flight-heading
+- **Blip taxonomy**: enemy tanks = **varying shades of red** heading triangles
+  with a **gun-direction tick** (hull heading + live turret yaw); hunter
+  supertank = brightest/larger red triangle; bomber = actual-position flight-heading
   triangle (only while its blip lives); missiles = orange arrows, player locks
   pulsing red; scanner = blue diamond; co-op allies = green.
 - **Rotating sweep line** — cosmetic phosphor flavor; blip lifetimes are governed by the information rules, not the sweep.

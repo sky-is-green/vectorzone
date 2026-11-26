@@ -45,7 +45,7 @@ describe('awareness rules (RADAR.md)', () => {
     w.structures.push(makeStructure(600, 'tower', 0, 30));
     // enemy fires (force cooldown 0 + aim at player via brain? direct event path:
     // make the enemy shoot by giving it a known contact and LOS-free policy)
-    w.awareness.set(1, new Map([[0, { x: 0, z: 0, heading: 0, tick: w.tick, source: 'ping' }]]));
+    w.awareness.set(1, new Map([[0, { x: 0, z: 0, heading: 0, turretYaw: 0, tick: w.tick, source: 'ping' }]]));
     let fired = false;
     for (let i = 0; i < 400 && !fired; i++) {
       stepWorld(w);
@@ -92,5 +92,12 @@ describe('awareness rules (RADAR.md)', () => {
     w.stormUntil = 0;
     for (let i = 0; i < 6; i++) stepWorld(w);
     expect(w.awareness.get(0)?.get(1)?.source).toBe('los');
+  });
+
+  it('awareness records turret angle for radar orientation', () => {
+    const w = twoTanks(20);
+    w.tanks[1].turretYaw = 0.7;
+    for (let i = 0; i < 6; i++) stepWorld(w);
+    expect(w.awareness.get(0)?.get(1)?.turretYaw).toBeCloseTo(0.7);
   });
 });

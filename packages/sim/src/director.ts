@@ -226,7 +226,7 @@ function stepMissiles(w: World): void {
     if (hit) {
       m.alive = false;
       w.pendingExplosions.push({ pos: [m.pos[0], 0.5, m.pos[2]], radius: 3, damage: 4, source: 'missile' });
-    } else if (m.age > 600 || Math.abs(m.pos[0]) > 220 || Math.abs(m.pos[2]) > 220) {
+    } else if (m.age > 1200 || Math.abs(m.pos[0]) > 220 || Math.abs(m.pos[2]) > 220) {
       m.alive = false;
     }
   }

@@ -57,7 +57,7 @@ describe('AI imperfection (AI.md)', () => {
     for (let i = 0; i < 40; i++) {
       ws.tick += 24;
       ws.events = [];
-      ws.awareness.set(1, new Map([[0, { x: 0, z: 0, heading: 0, tick: ws.tick, source: 'ping' }]]));
+      ws.awareness.set(1, new Map([[0, { x: 0, z: 0, heading: 0, turretYaw: 0, tick: ws.tick, source: 'ping' }]]));
       thinkBrain(ws, bs, ws.tanks[1]);
     }
     expect(bs.mode).toBe('reposition');
@@ -70,7 +70,7 @@ describe('AI imperfection (AI.md)', () => {
     for (let i = 0; i < 40; i++) {
       wu.tick += 15;
       wu.events = [];
-      wu.awareness.set(1, new Map([[0, { x: 0, z: 0, heading: 0, tick: wu.tick, source: 'ping' }]]));
+      wu.awareness.set(1, new Map([[0, { x: 0, z: 0, heading: 0, turretYaw: 0, tick: wu.tick, source: 'ping' }]]));
       const cmd = thinkBrain(wu, bu, wu.tanks[1]);
       if (cmd.fire) superShots++;
       wu.tanks[1].cooldown = 0; // isolate policy from cooldown discipline

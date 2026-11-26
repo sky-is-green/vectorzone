@@ -23,6 +23,7 @@ export interface HudState {
   z: number;
   known: Map<number, Known> | undefined;
   tankHeadings: Map<number, number>;
+  tankTurrets: Map<number, number>;
   missiles: HudMissile[];
   scanner: { x: number; z: number } | null;
   bomber: { x: number; z: number; heading: number } | null;
@@ -44,6 +45,13 @@ export interface HudState {
 
 const RADAR_R = 38;
 const RADAR_RANGE = 200;
+const ENEMY_REDS = [0xff4433, 0xff6b3d, 0xc62828, 0xff8a65, 0xb71c1c];
+
+/** Enemy blips are shades of red, never phosphate green. */
+export function enemyColor(id: number, alpha = 255, superTank = false): string {
+  const base = superTank ? 0xff2d2d : ENEMY_REDS[Math.abs(id) % ENEMY_REDS.length];
+  return '#' + base.toString(16).padStart(6, '0') + Math.max(0, Math.min(255, alpha)).toString(16).padStart(2, '0');
+}
 
 export function createHud(): {
   canvas: HTMLCanvasElement;
@@ -130,9 +138,19 @@ export function createHud(): {
           const p = place(k.x, k.z);
           const age = s.tick - k.tick;
           const fade = k.source === 'gunfire' || k.source === 'ping' ? Math.max(0, 1 - age / 180) : 1;
-          const alpha = Math.floor(fade * 255).toString(16).padStart(2, '0');
+          const alpha = Math.floor(fade * 255);
+          const isSuper = s.superIds.has(id);
+          const color = enemyColor(id, alpha, isSuper);
           const heading = s.tankHeadings.get(id) ?? k.heading;
-          triangle(p.x, p.y, relativeHeading(heading, s.heading), s.superIds.has(id) ? 6 : 4.5, P.worldCss + alpha);
+          const turretYaw = s.tankTurrets.get(id) ?? k.turretYaw ?? 0;
+          triangle(p.x, p.y, relativeHeading(heading, s.heading), isSuper ? 6 : 4.5, color);
+          // turret heading tick: the gun points at hull heading + turret yaw
+          const gunAngle = relativeHeading(heading + turretYaw, s.heading);
+          ctx.strokeStyle = color;
+          ctx.beginPath();
+          ctx.moveTo(p.x, p.y);
+          ctx.lineTo(p.x + Math.sin(gunAngle) * 8, p.y - Math.cos(gunAngle) * 8);
+          ctx.stroke();
         }
       }
 
