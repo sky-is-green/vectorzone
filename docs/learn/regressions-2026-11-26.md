@@ -33,19 +33,20 @@ enemy turret orientation was not tracked.
    **turret-aligned pointer**; both the long line and centre tick now follow
    turret yaw. `radarPointer()` has a sign regression test, and zoomed browser
    captures confirm ArrowLeft → upper-left, ArrowRight → upper-right.
-7. **Turret appeared inverted in play** — the *hull* steering input was still
-   inverted (`A` → positive yaw → right), dragging the mounted gun right.
-   Fixed `A` → `-1`, `D` → `+1` and gamepad stick X to the same world
-   convention. Browser confirms `A` → heading `-0.03`, `D` → `+0.03`.
+7. **Turret/hull appeared inverted in rendered play** — the game camera looks
+   along +Z, so camera screen-right is **-X**, not +X. Positive world yaw
+   therefore turns the rendered hull/gun LEFT. My previous sign fix used the
+   wrong camera basis. Restored positive yaw for A/ArrowLeft (and gamepad left),
+   and added `radarDisplayYaw = -worldYaw` so the minimap still displays left
+   correctly. Browser proof: cameraRightX=-1; A heading +0.54 gives screenDot
+   -0.514 (left); ArrowLeft turret tip NDC X 0 vs hull nose +1.068 (turret left).
 
 ## Verification
 
-101 tests (new: turret sign, enemy colour, fat-line segment integrity,
-missile reaches target, awareness turret angle, radar pointer sign). Browser:
-zero console errors, scanner 780/0 diagonals, ArrowLeft negative yaw, guided
-missile hit, red radar triangles with turret ticks, 52 draw calls, 150.5 KB gz.
-
-Hull steering sign fixed in a following patch: 102 tests, `A` negative / `D`
-positive heading confirmed in browser.
+103 tests (turret sign, enemy colour, fat-line segment integrity, missile
+reaches target, awareness turret angle, radar pointer/display sign). Browser:
+zero console errors, scanner 780/0 diagonals, rendered hull/gun move screen-left
+on A/ArrowLeft, minimap display yaw keeps left, guided missile hit, red radar
+triangles with turret ticks, 52 draw calls, 150.5 KB gz.
 
 Human feel confirmation remains open in F5.

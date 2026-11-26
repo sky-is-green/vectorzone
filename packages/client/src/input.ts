@@ -5,13 +5,14 @@
  */
 import { neutralCommand, type TankCommand } from '@vectorzone/sim';
 
-/** Positive world yaw turns right (+X), so left/right map inverted. */
+/** The game camera looks along +Z, so screen-right is -X. Positive world
+ * yaw therefore turns the rendered turret LEFT; left input uses +1. */
 export function turretAxisFromKeys(left: boolean, right: boolean): number {
-  return (right ? 1 : 0) - (left ? 1 : 0);
+  return (left ? 1 : 0) - (right ? 1 : 0);
 }
 
 export function hullTurnAxisFromKeys(left: boolean, right: boolean): number {
-  return (right ? 1 : 0) - (left ? 1 : 0);
+  return (left ? 1 : 0) - (right ? 1 : 0);
 }
 
 const HELD = new Set<string>();
@@ -59,9 +60,9 @@ export function readCommand(): TankCommand {
     const fire = !!p.buttons[0]?.pressed || !!p.buttons[7]?.pressed;
     if (lx || ly || rx || ry || fire) {
       c.throttle = -ly;
-      c.turn = lx;
-      // world yaw + rotates +Z toward +X (right); stick X follows that convention
-      c.turretYaw = rx;
+      c.turn = -lx;
+      // camera screen-right is -X: left stick left (lx<0) gives positive yaw
+      c.turretYaw = -rx;
       c.gunPitch = -ry;
       c.fire = fire;
       break;

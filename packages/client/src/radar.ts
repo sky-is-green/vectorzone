@@ -34,3 +34,9 @@ export function headingFromDir(x: number, z: number): number {
 export function radarPointer(yaw: number, length: number): { x: number; y: number } {
   return { x: Math.sin(yaw) * length, y: -Math.cos(yaw) * length };
 }
+
+/** World yaw + turns left in the +Z camera; the minimap's display yaw is
+ * negated so it still reads left as left. */
+export function radarDisplayYaw(worldYaw: number): number {
+  return -worldYaw;
+}

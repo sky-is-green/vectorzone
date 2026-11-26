@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { headingFromDir, projectRadar, radarPointer, relativeHeading } from './radar';
+import { headingFromDir, projectRadar, radarDisplayYaw, radarPointer, relativeHeading } from './radar';
 
 describe('radar projection + orientation', () => {
   it('forward contact points up', () => {
@@ -37,5 +37,11 @@ describe('radar projection + orientation', () => {
     expect(radarPointer(0.7, 10).x).toBeGreaterThan(0);
     expect(radarPointer(0, 10).x).toBeCloseTo(0);
     expect(radarPointer(0, 10).y).toBeLessThan(0);
+  });
+
+  it('world yaw is negated for the +Z camera minimap display', () => {
+    // screen-left world yaw is positive; displayed pointer must go left
+    expect(radarPointer(radarDisplayYaw(0.7), 10).x).toBeLessThan(0);
+    expect(radarPointer(radarDisplayYaw(-0.7), 10).x).toBeGreaterThan(0);
   });
 });

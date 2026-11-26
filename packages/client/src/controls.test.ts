@@ -3,11 +3,11 @@ import { hullTurnAxisFromKeys, turretAxisFromKeys } from './input';
 import { enemyColor } from './hud';
 
 describe('turret control sign', () => {
-  it('ArrowLeft yields negative yaw (turns left)', () => {
-    expect(turretAxisFromKeys(true, false)).toBe(-1);
+  it('ArrowLeft yields positive world yaw (screen-left)', () => {
+    expect(turretAxisFromKeys(true, false)).toBe(1);
   });
-  it('ArrowRight yields positive yaw (turns right)', () => {
-    expect(turretAxisFromKeys(false, true)).toBe(1);
+  it('ArrowRight yields negative world yaw (screen-right)', () => {
+    expect(turretAxisFromKeys(false, true)).toBe(-1);
   });
   it('both or neither is neutral', () => {
     expect(turretAxisFromKeys(false, false)).toBe(0);
@@ -16,9 +16,9 @@ describe('turret control sign', () => {
 });
 
 describe('hull steering sign', () => {
-  it('A steers left, D steers right', () => {
-    expect(hullTurnAxisFromKeys(true, false)).toBe(-1);
-    expect(hullTurnAxisFromKeys(false, true)).toBe(1);
+  it('A steers screen-left, D screen-right', () => {
+    expect(hullTurnAxisFromKeys(true, false)).toBe(1);
+    expect(hullTurnAxisFromKeys(false, true)).toBe(-1);
   });
 });
 
