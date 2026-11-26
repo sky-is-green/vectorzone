@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { turretAxisFromKeys } from './input';
+import { hullTurnAxisFromKeys, turretAxisFromKeys } from './input';
 import { enemyColor } from './hud';
 
 describe('turret control sign', () => {
@@ -12,6 +12,13 @@ describe('turret control sign', () => {
   it('both or neither is neutral', () => {
     expect(turretAxisFromKeys(false, false)).toBe(0);
     expect(turretAxisFromKeys(true, true)).toBe(0);
+  });
+});
+
+describe('hull steering sign', () => {
+  it('A steers left, D steers right', () => {
+    expect(hullTurnAxisFromKeys(true, false)).toBe(-1);
+    expect(hullTurnAxisFromKeys(false, true)).toBe(1);
   });
 });
 

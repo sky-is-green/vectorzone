@@ -33,6 +33,10 @@ enemy turret orientation was not tracked.
    **turret-aligned pointer**; both the long line and centre tick now follow
    turret yaw. `radarPointer()` has a sign regression test, and zoomed browser
    captures confirm ArrowLeft → upper-left, ArrowRight → upper-right.
+7. **Turret appeared inverted in play** — the *hull* steering input was still
+   inverted (`A` → positive yaw → right), dragging the mounted gun right.
+   Fixed `A` → `-1`, `D` → `+1` and gamepad stick X to the same world
+   convention. Browser confirms `A` → heading `-0.03`, `D` → `+0.03`.
 
 ## Verification
 
@@ -40,5 +44,8 @@ enemy turret orientation was not tracked.
 missile reaches target, awareness turret angle, radar pointer sign). Browser:
 zero console errors, scanner 780/0 diagonals, ArrowLeft negative yaw, guided
 missile hit, red radar triangles with turret ticks, 52 draw calls, 150.5 KB gz.
+
+Hull steering sign fixed in a following patch: 102 tests, `A` negative / `D`
+positive heading confirmed in browser.
 
 Human feel confirmation remains open in F5.

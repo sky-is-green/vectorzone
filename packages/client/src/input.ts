@@ -5,8 +5,12 @@
  */
 import { neutralCommand, type TankCommand } from '@vectorzone/sim';
 
-/** Positive world turret yaw turns right (+X), so left/right map inverted. */
+/** Positive world yaw turns right (+X), so left/right map inverted. */
 export function turretAxisFromKeys(left: boolean, right: boolean): number {
+  return (right ? 1 : 0) - (left ? 1 : 0);
+}
+
+export function hullTurnAxisFromKeys(left: boolean, right: boolean): number {
   return (right ? 1 : 0) - (left ? 1 : 0);
 }
 
@@ -39,7 +43,7 @@ export function bindInput(): void {
 export function readCommand(): TankCommand {
   const c = neutralCommand();
   c.throttle = (HELD.has('KeyW') ? 1 : 0) - (HELD.has('KeyS') ? 1 : 0);
-  c.turn = (HELD.has('KeyA') ? 1 : 0) - (HELD.has('KeyD') ? 1 : 0);
+  c.turn = hullTurnAxisFromKeys(HELD.has('KeyA'), HELD.has('KeyD'));
   c.turretYaw = turretAxisFromKeys(HELD.has('ArrowLeft'), HELD.has('ArrowRight'));
   c.gunPitch = (HELD.has('ArrowUp') ? 1 : 0) - (HELD.has('ArrowDown') ? 1 : 0);
   c.fire = HELD.has('Space');
@@ -55,7 +59,7 @@ export function readCommand(): TankCommand {
     const fire = !!p.buttons[0]?.pressed || !!p.buttons[7]?.pressed;
     if (lx || ly || rx || ry || fire) {
       c.throttle = -ly;
-      c.turn = -lx;
+      c.turn = lx;
       // world yaw + rotates +Z toward +X (right); stick X follows that convention
       c.turretYaw = rx;
       c.gunPitch = -ry;
