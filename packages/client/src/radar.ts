@@ -40,3 +40,9 @@ export function radarPointer(yaw: number, length: number): { x: number; y: numbe
 export function radarDisplayYaw(worldYaw: number): number {
   return -worldYaw;
 }
+
+/** Expanding HUD pulse progress, or null outside its lifetime. */
+export function pulseProgress(now: number, startedAt: number, duration = 1200): number | null {
+  const age = now - startedAt;
+  return age >= 0 && age < duration ? age / duration : null;
+}

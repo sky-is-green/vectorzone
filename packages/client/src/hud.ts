@@ -26,6 +26,7 @@ export interface HudState {
   tankTurrets: Map<number, number>;
   missiles: HudMissile[];
   scanner: { x: number; z: number } | null;
+  scanPulse: number | null; // 0..1 progress, null when inactive
   bomber: { x: number; z: number; heading: number } | null;
   bomberBlip: boolean;
   superIds: Set<number>;
@@ -174,6 +175,20 @@ export function createHud(): {
         ctx.lineTo(p.x - 4, p.y);
         ctx.closePath();
         ctx.fill();
+        if (s.scanPulse !== null) {
+          const progress = Math.max(0, Math.min(1, s.scanPulse));
+          const radius = 4 + progress * 22;
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(cx, cy, RADAR_R, 0, Math.PI * 2);
+          ctx.clip();
+          ctx.strokeStyle = `rgba(53,224,255,${(1 - progress).toFixed(3)})`;
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+        }
       }
 
       // Missiles: orange arrows; player-targeted locks pulse larger.

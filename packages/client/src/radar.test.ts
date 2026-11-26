@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { headingFromDir, projectRadar, radarDisplayYaw, radarPointer, relativeHeading } from './radar';
+import { headingFromDir, projectRadar, pulseProgress, radarDisplayYaw, radarPointer, relativeHeading } from './radar';
 
 describe('radar projection + orientation', () => {
   it('forward contact points up', () => {
@@ -43,5 +43,11 @@ describe('radar projection + orientation', () => {
     // screen-left world yaw is positive; displayed pointer must go left
     expect(radarPointer(radarDisplayYaw(0.7), 10).x).toBeLessThan(0);
     expect(radarPointer(radarDisplayYaw(-0.7), 10).x).toBeGreaterThan(0);
+  });
+
+  it('scan pulse progresses and expires', () => {
+    expect(pulseProgress(1000, 1000)).toBe(0);
+    expect(pulseProgress(1600, 1000)).toBeCloseTo(0.5);
+    expect(pulseProgress(2200, 1000)).toBeNull();
   });
 });

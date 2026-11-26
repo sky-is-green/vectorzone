@@ -38,6 +38,7 @@ import { ParticlePool } from './particles';
 import { createPost } from './post';
 import { buildChunkGeometry, buildRubbleGeometry, buildScenery } from './scenery';
 import { buildPanel, loadSettings, saveSettings, type Settings } from './settings';
+import { pulseProgress } from './radar';
 import { explosionShake, impactShake } from './feedback';
 import './style.css';
 
@@ -174,6 +175,7 @@ scene.add(trajLines);
 
 const hud = createHud();
 let lastBombBlip = -1e9;
+let lastScanPing = -1e9;
 let matchReported = false;
 const killfeed: { text: string; born: number }[] = [];
 let hitFlash: { angle: number; born: number } | null = null;
@@ -751,7 +753,10 @@ function frame(now: number): void {
     else if (ev.kind === 'volcanoErupt') hud.alert('ERUPTION');
     else if (ev.kind === 'matchEnd') hud.alert('MATCH COMPLETE');
     else if (ev.kind === 'kill' && ev.what === 'bomber') hud.alert('BOMBER DOWN');
-    else if (ev.kind === 'scanPing') hud.alert('SCAN PING');
+    else if (ev.kind === 'scanPing') {
+      lastScanPing = now;
+      hud.alert('SCAN PING');
+    }
     else if (ev.kind === 'ionStorm') hud.alert('ION STORM — RADAR DOWN');
     else if (ev.kind === 'meteorInbound') hud.alert('METEOR INBOUND');
     else if (ev.kind === 'missileLock') hud.alert('MISSILE LOCK');
@@ -918,6 +923,7 @@ function frame(now: number): void {
       targeted: m.targetId === 0,
     })),
     scanner: scanner ? { x: scanner.x, z: scanner.z } : null,
+    scanPulse: pulseProgress(now, lastScanPing),
     bomber: world.bomber ? {
       x: world.bomber.pos[0],
       z: world.bomber.pos[2],
