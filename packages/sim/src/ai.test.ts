@@ -16,6 +16,8 @@ function duel(dist: number, kind: 'slow' | 'super' = 'slow') {
   w.brains.set(1, createBrain(kind));
   w.tanks[0].spawnTick = -1000;
   w.nextSpawnTick = 1e9; // director idle: test the brain alone
+  w.nextSuperTick = 1e9;
+  w.nextMissileTick = 1e9;
   w.nextBomberTick = 1e9;
   return w;
 }
@@ -121,19 +123,21 @@ describe('bomber (AI.md §5.4)', () => {
     for (let i = 0; i < 12; i++) stepWorld(w, [N]);
     const b = w.bomber!;
     expect(b).toBeTruthy();
-    const dir0 = [...b.dir];
     // put the player under its path
     w.tanks[0].x = b.pos[0] + b.dir[0] * 40;
     w.tanks[0].z = b.pos[2] + b.dir[2] * 40;
+    let maxTurn = 0;
+    let prevDir = [...b.dir];
     let telegraphAt = -1;
     let explosionAt = -1;
     for (let i = 0; i < 600; i++) {
       stepWorld(w, [N]);
+      maxTurn = Math.max(maxTurn, Math.hypot(b.dir[0] - prevDir[0], b.dir[2] - prevDir[2]));
+      prevDir = [...b.dir];
       if (telegraphAt < 0 && w.events.some((e) => e.kind === 'bombTelegraph')) telegraphAt = w.tick;
       if (telegraphAt >= 0 && explosionAt < 0 && w.events.some((e) => e.kind === 'explosion')) explosionAt = w.tick;
-      expect(b.dir[0]).toBeCloseTo(dir0[0], 9); // straight line
-      expect(b.dir[2]).toBeCloseTo(dir0[2], 9);
     }
+    expect(maxTurn).toBeLessThanOrEqual(0.003); // minor per-tick corrections
     expect(telegraphAt).toBeGreaterThan(0);
     expect(explosionAt - telegraphAt).toBeGreaterThanOrEqual(TELEGRAPH_TICKS);
   });

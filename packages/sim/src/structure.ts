@@ -51,11 +51,17 @@ const ROCKS: string[][] = [
 ];
 
 const SCAN: string[][] = [
-  ['HHH', 'HHH', 'HHH'],
-  ['.H.', '.H.', '.H.'],
-  ['.H.', '.H.', '.H.'],
-  ['GGG', 'GGG', 'GGG'],
-  ['.G.', '.G.', '.G.'],
+  ['SSSSSSS', 'SSSSSSS', 'SSSSSSS', 'SSSSSSS', 'SSSSSSS', 'SSSSSSS', 'SSSSSSS'],
+  ['SSSSSSS', 'SSSSSSS', 'SSSSSSS', 'SSSSSSS', 'SSSSSSS', 'SSSSSSS', 'SSSSSSS'],
+  ['..SSS..', '..SSS..', '..SSS..', '..SSS..', '..SSS..', '..SSS..', '..SSS..'],
+  ['..SSS..', '..SSS..', '..SSS..', '..SSS..', '..SSS..', '..SSS..', '..SSS..'],
+  ['..SSS..', '..SSS..', '..SSS..', '..SSS..', '..SSS..', '..SSS..', '..SSS..'],
+  ['..SSS..', '..SSS..', '..SSS..', '..SSS..', '..SSS..', '..SSS..', '..SSS..'],
+  ['..SSS..', '..SSS..', '..SSS..', '..SSS..', '..SSS..', '..SSS..', '..SSS..'],
+  ['GGGGGGG', 'GGGGGGG', 'GGGGGGG', 'GGGGGGG', 'GGGGGGG', 'GGGGGGG', 'GGGGGGG'],
+  ['..GGG..', '..GGG..', '..GGG..', '..GGG..', '..GGG..', '..GGG..', '..GGG..'],
+  ['...G...', '...G...', '...G...', '...G...', '...G...', '...G...', '...G...'],
+  ['...G...', '...G...', '...G...', '...G...', '...G...', '...G...', '...G...'],
 ];
 
 const PYLON: string[][] = [

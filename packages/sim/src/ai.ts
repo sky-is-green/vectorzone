@@ -35,6 +35,8 @@ export interface AiBrain {
   kind: AiKind;
   mode: 'approach' | 'engage' | 'reposition';
   targetId: number | null;
+  /** Director-designated hunter: always prefers the player when known. */
+  playerTracker: boolean;
   aim: { x: number; z: number } | null; // where the turret is pointed
   strafe: 1 | -1;
   nextThink: number;
@@ -48,11 +50,12 @@ export interface AiBrain {
   debug: { intent: V3 | null; los: boolean; err: number };
 }
 
-export function createBrain(kind: AiKind): AiBrain {
+export function createBrain(kind: AiKind, playerTracker = false): AiBrain {
   return {
     kind,
     mode: 'approach',
     targetId: null,
+    playerTracker,
     aim: null,
     strafe: 1,
     nextThink: 0,
@@ -77,17 +80,29 @@ const wrap = (a: number): number => {
   return a;
 };
 
-/** Pick the freshest known contact; memory ghosts are drive-to points only. */
+/** Pick a target. One director-designated hunter prefers the player; all
+ * other AI prefer other tanks (FFA), falling back to the player only when no
+ * AI contact is known. */
 function pickTarget(w: World, t: Tank): { id: number; k: Known } | null {
   const m = w.awareness.get(t.id);
   if (!m) return null;
-  let best: { id: number; k: Known } | null = null;
+  const candidates: { id: number; k: Known }[] = [];
   for (const [id, k] of m) {
     const target = w.tanks.find((x) => x.id === id);
     if (!target || !targetable(w, target)) continue;
-    if (!best || k.tick > best.k.tick) best = { id, k };
+    candidates.push({ id, k });
   }
-  return best;
+  if (brainPrefersPlayer(w, t)) {
+    const player = candidates.find((c) => c.id === 0);
+    if (player) return player;
+  }
+  const ffa = candidates.filter((c) => c.id !== 0).sort((a, b) => b.k.tick - a.k.tick);
+  if (ffa.length) return ffa[0];
+  return candidates.sort((a, b) => b.k.tick - a.k.tick)[0] ?? null;
+}
+
+function brainPrefersPlayer(w: World, t: Tank): boolean {
+  return w.brains.get(t.id)?.playerTracker ?? false;
 }
 
 export function thinkBrain(w: World, brain: AiBrain, t: Tank): TankCommand {

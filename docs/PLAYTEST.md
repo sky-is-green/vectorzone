@@ -57,6 +57,7 @@ tuning. A milestone with an un-run play-test is not fully done (BUILD.md §3).
 | F2 | 2026-11-25 | M3 | Destruction feel unverified by human; tuning question: muzzle (1.2 m) overflies low cover (0.6–0.9 m) on flat shots — is aiming down at low structures intuitive? | Play-test: hole readability from both sides, debris/collapse satisfaction, chain legibility, low-cover aiming feel | **open — awaiting M3 session** |
 | F3 | 2026-11-25 | M4 | Phosphor look (bloom glow, CRT scanlines/ghosting, palettes) verified numerically only — desktop window was hidden so no screenshots; needs human eyes | View each palette + wireframe + safe mode; confirm glow reads as phosphor, not smear; CRT comfortable | **CLOSED** — user: "looks good" |
 | F4 | 2026-11-25 | M5 | 5e/5f visuals (status readout, killfeed, hit flash, fence curtains, scan tower) verified by tests/numeric probes only — window hidden | View fence shimmer + drop, status squares under damage, killfeed/hit flash in play; confirm readability in all palettes | **open — awaiting visible window** |
+| F5 | 2026-11-26 | Polish | Four-AI FFA pressure, supertank cadence, airborne missile locks, deadly final-minute volcano, aircraft ease-of-hit, shake timing, and Line2 hierarchy need human feel confirmation | Play a full 10-minute match; confirm pressure is fun not overwhelming, missiles dodgeable, volcano deadly/fair, plane hittable, no distant shake | **open — awaiting human session** |
 
 ## Rule
 

@@ -55,7 +55,8 @@ describe('energy fences & scan tower (5f)', () => {
     expect(pings).toBe(2);
     // destroy the scan tower at (-40,-80): one explosion covers its footprint
     const scan = w.structures.find((s) => s.kind === 'scan')!;
-    w.pendingExplosions.push([-40, 0.75, -80]);
+    w.pendingExplosions.push({ pos: [-40, 0.75, -80], radius: 2.5, damage: 6, source: 'ammo' });
+    w.pendingExplosions.push({ pos: [-40, 1.5, -80], radius: 2.5, damage: 6, source: 'ammo' });
     for (let i = 0; i < 5; i++) stepWorld(w, [N]);
     expect(scan.grid.cells.some((c) => c)).toBe(false);
     const before = w.tick;

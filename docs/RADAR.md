@@ -18,6 +18,9 @@ Nothing else is visible by default. A distant, silent tank is **dark**.
 | **Proximity** (≤30 m) | enemy blip, continuous | while in range |
 | **Gunfire** (any shooter) | bright flash blip at shooter position | ~3 s fade |
 | **Scan-tower ping** | every tank's position, all radars | every ~10 s while a tower lives; blips fade ~3 s |
+| **Missile lock** | player-targeted missile arrow, pulsing red | while alive |
+| **All airborne missiles** | orange heading arrows | while alive |
+| **Scanner objective** | blue diamond | while standing |
 | **Bomber bomb drop** | the bomber blips (it fired — rule 1 applies) | ~3 s fade |
 | **Ion storm** | nothing — scope full of static | storm duration |
 | **Spawn grace** | fresh spawns invisible | first 2 s |
@@ -43,13 +46,16 @@ The original radar showed every enemy at all times. Ours turns information into 
 - **Line-of-fire sight** (user direction 2026-11-25): a dim trajectory line from the muzzle to the predicted first impact (grid / obstacle / ground), with an impact cross — makes long-range and elevated shots readable before firing. Canvas 2D — light, crisp, no extra three.js scene needed.
 - **Faint inner ring marks the 30 m sense radius**, so the player always understands what the radar can and can't see.
 - **Radar range ~200 m**; contacts beyond it clamp to the rim (direction preserved, distance lost).
-- **Blip taxonomy**: enemy tanks = red dots; hunter supertank = larger dot; bomber = wedge (only while its blip lives); co-op allies = green.
+- **Blip taxonomy**: enemy tanks = heading triangles using **live hull heading**;
+  hunter supertank = larger triangle; bomber = actual-position flight-heading
+  triangle (only while its blip lives); missiles = orange arrows, player locks
+  pulsing red; scanner = blue diamond; co-op allies = green.
 - **Rotating sweep line** — cosmetic phosphor flavor; blip lifetimes are governed by the information rules, not the sweep.
 - Blips flash bright then **decay like phosphor**; ion storm fills the scope with animated static.
 
 ## 5. Symmetry: AI knows exactly what you know
 
-**The AI's awareness uses these same rules** (`docs/AI.md` §3): gunfire reveal, 30 m proximity, line-of-sight + last-seen memory, scan pings, storm blindness, spawn grace. If a player can't know it, neither can the AI. One information model, no special cases, no wallhacks.
+**The AI's awareness uses these same rules** (`docs/AI.md` §3): gunfire reveal, 30 m proximity, line-of-sight + last-seen memory, scan pings, storm blindness, spawn grace. If a player can't know it, neither can the AI. One information model, no special cases, no wallhacks. Full LOS scans run at 10 Hz; proximity and gunfire remain per-tick.
 
 ## 6. Architecture & multiplayer honesty
 

@@ -6,7 +6,7 @@
  * z = length (forward = +z). `rev` increments on every mutation so the
  * renderer knows when to rebuild merged geometry (invariant I10).
  */
-export type BlockType = 'hull' | 'tread' | 'gun' | 'engine' | 'core' | 'ammo';
+export type BlockType = 'hull' | 'tread' | 'gun' | 'engine' | 'core' | 'ammo' | 'scanner';
 
 export interface Block {
   type: BlockType;
@@ -35,6 +35,7 @@ export const BLOCK_HP: Record<BlockType, number> = {
   engine: 2,
   core: 1,
   ammo: 1,
+  scanner: 6,
 };
 
 export const BLOCK_MASS: Record<BlockType, number> = {
@@ -44,6 +45,7 @@ export const BLOCK_MASS: Record<BlockType, number> = {
   engine: 1.5,
   core: 1,
   ammo: 1,
+  scanner: 3,
 };
 
 const CHAR_TYPE: Record<string, BlockType> = {
@@ -53,6 +55,7 @@ const CHAR_TYPE: Record<string, BlockType> = {
   E: 'engine',
   C: 'core',
   A: 'ammo',
+  S: 'scanner',
 };
 
 export function createGrid(size: GridSize): BlockGrid {

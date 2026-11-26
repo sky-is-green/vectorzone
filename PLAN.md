@@ -59,11 +59,11 @@ Deliberately avoided: React/any UI framework (HUD is canvas/DOM), physics engine
 The arcade drew pure transparent wireframes. For blow-through to *read*, we want objects to look solid until they're holey:
 
 - Each block contributes **black faces** (`MeshBasicMaterial`, color `#000000`) that write depth — they occlude whatever is behind them.
-- Each block contributes **glowing edge lines** (`LineSegments`, additive green).
+- Each block contributes **glowing edge lines** (`LineSegments2` / `LineMaterial`, additive phosphor).
 - Result: crisp solid silhouettes made of light. When blocks are destroyed, the faces and edges vanish together and you **see straight through the hole** to the interior and out the other side.
 - A settings toggle disables the black faces → authentic fully-transparent 1980 wireframe mode.
 
-This is cheap: black unlit faces need no lights at all. The whole game is `MeshBasicMaterial` + `LineBasicMaterial`.
+This is cheap: black unlit faces need no lights at all. The whole game is `MeshBasicMaterial` + `LineMaterial`; particles remain one thin `LineSegments` cloud.
 
 ### 4.2 Geometry strategy (the important performance decision)
 
@@ -72,7 +72,8 @@ Naively, 300 blocks × (mesh + lines) × 10 tanks = 6,000 draw calls. Instead:
 - **Per rigid body, merge everything into ONE face geometry + ONE line geometry.** Two draw calls per body: a tank is hull + rotating turret = 4, a structure = 2. (Resolved M1: the independently-aimed turret cannot share static hull geometry.)
 - **Cull interior faces/edges**: only emit a block face where the neighboring cell is empty (Minecraft-style). Fewer triangles, and when a neighbor is destroyed the newly exposed interior faces appear automatically on rebuild.
 - Rebuild the merged geometry **only when damage occurs** (a few times per second at most), never per frame. A few hundred blocks rebuild in well under a millisecond.
-- Debris and particles: one pooled `LineSegments` cloud for the whole scene.
+- **Line hierarchy** (user polish 2026-11-26): floor 1 px, tanks 2.4 px, structures 1.4 px, aircraft/missiles 1.8 px, horizon 1.1–1.2 px. `Line2` is used because WebGL `linewidth` is ignored on most platforms.
+- Debris and particles: one pooled thin `LineSegments` cloud for the whole scene.
 
 ### 4.3 Glow & CRT (post-processing)
 
@@ -125,17 +126,17 @@ Palette: green phosphor (`#39ff6b`-ish) for the world, red band for HUD (matchin
 
 Full design in **[`docs/AI.md`](docs/AI.md)**. Summary:
 
-- Keep the original's soul: one-enemy duels, score-driven escalation (slow tanks → missiles → supertanks), the radar-invisible bonus flyby (now a bomber), enemies that come to you, no retreat.
+- Keep the original's soul: tank → missile → supertank personalities, the radar-invisible bonus flyby (now a bomber), enemies that come to you, no retreat. Current director override: four respawning light tanks in FFA, exactly one player tracker, plus an occasional supertank.
 - Tone it down with **imperfect information** (LOS raycasts, last-seen memory, scan-tower pings — no wallhacks), **human-like aiming** (turret slew limits, error cones, ranging shots), reaction ticks, and fire discipline.
 - AI obeys the same physics and block damage as players; lava, crush, and ion storms affect it too.
-- Solo director is faithful; deathmatch adds always-on ambient AI (up to 4 respawning light tanks, max 1 engaging one player, supertank hunters every 2–3 min); co-op waves scale sublinearly. The bomber crosses every mode every 2 min — bombs its path, and shooting it reveals your position.
+- Four respawning light tanks are maintained in every mode; non-trackers fight FFA, exactly one tracks the player. Supertank hunters spawn at ~2.5 min then every 2–3 min. Airborne missiles appear every 25–55 s with limited-turn guidance and player lock alerts. The bomber crosses every mode every 2 min — targeted path, minor corrections, generous hitbox, path-denial bombs.
 - AI is just another producer of `TankCommand` in the shared sim → host-authoritative multiplayer needs zero extra AI netcode.
 
 ### 5.5 Radar & awareness — silence is stealth
 
 Full design in **[`docs/RADAR.md`](docs/RADAR.md)**. Summary:
 
-- The radar reveals **anything that fires** (~3 s fading blip) and **any enemy within 30 m** (continuous). Nothing else — distant silent tanks are dark.
+- The radar reveals **anything that fires** (~3 s fading blip) and **any enemy within 30 m** (continuous). Nothing else — distant silent tanks are dark. Player-targeted missiles lock onto the radar; all missiles show as heading arrows; the scanner is a blue objective diamond; tank and aircraft icons use live headings.
 - Scan-tower pings remain the only full-field reveal; ion storms blind the scope.
 - AI awareness mirrors the same rules (symmetry) — no wallhacks, no omniscience.
 - Faithful presentation: circular heading-up scope in the red HUD band, rotating sweep, phosphor-decay blips, faint 30 m sense ring.
@@ -212,7 +213,7 @@ Known limit: a few symmetric-NAT setups can't punch through WebRTC; the self-hos
 - Phosphor bloom + CRT shader + periscope mode (section 4).
 - Line-segment **debris & sparks**, pooled; detached chunks tumble with gravity.
 - **Screen shake** on hits/kills, subtle recoil kick on fire.
-- **Radar**: information-limited scope (gunfire + 30 m proximity), sweep animation, red HUD band, score/lives in vector-styled canvas.
+- **Radar**: information-limited scope (gunfire + 30 m proximity + lock/objective icons), sweep animation, red HUD band, score/lives in vector-styled canvas.
 - **Synthesized audio**: engine hum pitched to speed, tread squeak, shell crack, block crunch, kill boom, bomber warble. All oscillators/noise — zero files.
 - **Gamepad** support (left stick drives, right stick aims), plus the keyboard scheme above.
 - Escalating AI (slow tanks → missiles → supertanks), the bomber flyby, score/lives loop for solo play.

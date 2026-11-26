@@ -26,6 +26,7 @@ import {
   SPLASH_DAMAGE,
   type Shell,
   type SimEvent,
+  type Blast,
 } from './combat';
 import { stepAwareness, type Known } from './awareness';
 import { thinkBrain, AI_KNOBS, type AiBrain } from './ai';
@@ -65,7 +66,7 @@ export interface World {
   rubble: RubbleCell[];
   rubbleRev: number;
   events: SimEvent[];
-  pendingExplosions: V3[];
+  pendingExplosions: Blast[];
   nextId: number;
   // M5: awareness, AI, director, solo loop
   awareness: Map<number, Map<number, Known>>;
@@ -84,6 +85,8 @@ export interface World {
   lives: number;
   phase: 'play' | 'over';
   nextSpawnTick: number;
+  nextSuperTick: number;
+  nextMissileTick: number;
   nextBomberTick: number;
   respawnTick: number;
   nextLifeAt: number;
@@ -126,6 +129,8 @@ export function createWorld(seed: number, map: MapId = 'classic'): World {
     lives: 3,
     phase: 'play',
     nextSpawnTick: 120,
+    nextSuperTick: 9000, // first hunter at ~2.5 min, then every 2-3 min
+    nextMissileTick: 1800,
     nextBomberTick: BOMBER_PERIOD,
     respawnTick: 0,
     nextLifeAt: 10000,
@@ -180,7 +185,9 @@ function destroyCell(w: World, ctx: GridCtx, c: V3, damaged: Damaged, by: number
   setCell(ctx.g, c[0], c[1], c[2], null);
   damaged.set(ctx.g, ctx);
   w.events.push({ kind: 'blockDestroyed', pos: wp, by });
-  if (b.type === 'ammo') w.pendingExplosions.push(wp);
+  if (b.type === 'ammo') {
+    w.pendingExplosions.push({ pos: wp, radius: EXPLOSION_RADIUS, damage: EXPLOSION_DAMAGE, source: 'ammo' });
+  }
   for (const n of [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]] as V3[]) {
     const nc: V3 = [c[0] + n[0], c[1] + n[1], c[2] + n[2]];
     const nb = getCell(ctx.g, nc[0], nc[1], nc[2]);
@@ -267,16 +274,22 @@ function stepShells(w: World, damaged: Damaged): void {
 function stepExplosions(w: World, damaged: Damaged): void {
   const ctxs = gridCtxs(w);
   while (w.pendingExplosions.length) {
-    const pos = w.pendingExplosions.shift()!;
-    w.events.push({ kind: 'explosion', pos, radius: EXPLOSION_RADIUS });
+    const blast = w.pendingExplosions.shift()!;
+    w.events.push({
+      kind: 'explosion',
+      pos: blast.pos,
+      radius: blast.radius,
+      damage: blast.damage,
+      source: blast.source,
+    });
     for (const ctx of ctxs) {
       for (let z = 0; z < ctx.g.size.z; z++) {
         for (let y = 0; y < ctx.g.size.y; y++) {
           for (let x = 0; x < ctx.g.size.x; x++) {
             if (!getCell(ctx.g, x, y, z)) continue;
             const c: V3 = [x, y, z];
-            if (dist(cellWorld(ctx, c), pos) <= EXPLOSION_RADIUS) {
-              damageCell(w, ctx, c, EXPLOSION_DAMAGE, damaged, null);
+            if (dist(cellWorld(ctx, c), blast.pos) <= blast.radius) {
+              damageCell(w, ctx, c, blast.damage, damaged, null);
             }
           }
         }
@@ -485,7 +498,7 @@ export function stepWorld(w: World, commands: TankCommand[] = []): void {
               if (getCell(t.hull, x, y, z)) occupied.push([x, y, z]);
         if (occupied.length) {
           const c = occupied[Math.floor(w.rng.next() * occupied.length)];
-          damageCell(w, { g: t.hull, tank: t, part: 'hull' }, c, 1, damaged, null);
+          damageCell(w, { g: t.hull, tank: t, part: 'hull' }, c, 2, damaged, null);
         }
       }
     }
@@ -533,7 +546,7 @@ export function hashWorld(w: World): string {
     }
   }
   for (const [id, b] of [...w.brains.entries()].sort((a, b) => a[0] - b[0])) {
-    parts.push(`b${id}:${b.mode}:${b.targetId}:${b.shotsAtContact}`);
+    parts.push(`b${id}:${b.mode}:${b.targetId}:${b.shotsAtContact}:${b.playerTracker ? 1 : 0}`);
   }
   parts.push(
     `rub${w.rubble.length}:${w.rubbleRev}`,
@@ -545,7 +558,12 @@ export function hashWorld(w: World): string {
     `vol${w.volcano.state}`,
     `lava${w.lavaPools.length}`,
     `fen${w.fences.filter((f) => fenceAlive(w, f)).length}`,
+    `spawn${w.nextSpawnTick}:${w.nextSuperTick}:${w.nextMissileTick}`,
   );
+  for (const m of w.missiles) {
+    parts.push(`m${m.id}:${m.pos.map((n) => n.toFixed(3))}:${m.dir.map((n) => n.toFixed(3))}:${m.targetId}:${m.tracking ? 1 : 0}`);
+  }
+  if (w.bomber) parts.push(`b${w.bomber.id}:${w.bomber.pos.map((n) => n.toFixed(3))}:${w.bomber.targetId}`);
   const s = parts.join(';');
   let h = 0x811c9dc5;
   for (let i = 0; i < s.length; i++) {

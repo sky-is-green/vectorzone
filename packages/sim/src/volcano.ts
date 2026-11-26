@@ -4,7 +4,7 @@
  * cycles. Eruption bombs are telegraphed (>= 1.5 s) and leave lava pools or
  * fresh destructible rock cover — the arena rearranges itself at the climax.
  */
-import { MATCH_TICKS, VOLCANO_FINAL_TICKS } from './combat';
+import { MATCH_TICKS, VOLCANO_FINAL_TICKS, VOLCANO_BLAST_RADIUS, LAVA_RADIUS, LAVA_TICKS } from './combat';
 import { makeStructure } from './structure';
 import type { World } from './world';
 
@@ -42,19 +42,19 @@ export function stepVolcano(w: World): void {
   } else if (v.state === 'rumble') {
     if (w.tick >= v.untilTick) {
       v.state = 'erupt';
-      v.untilTick = w.tick + 480; // 8 s
-      v.bombsLeft = 2 + Math.floor(w.rng.next() * 4);
-      v.nextBomb = w.tick + 60;
+      v.untilTick = w.tick + 600; // 10 s sustained eruption
+      v.bombsLeft = 10 + Math.floor(w.rng.next() * 7);
+      v.nextBomb = w.tick + 30;
       w.events.push({ kind: 'volcanoErupt' });
     }
   } else if (v.state === 'erupt') {
     if (v.bombsLeft > 0 && w.tick >= v.nextBomb) {
-      const x = (w.rng.next() - 0.5) * 300;
-      const z = (w.rng.next() - 0.5) * 300;
-      w.telegraphs.push({ x, z, impactTick: w.tick + 90, radius: 2.5, kind: 'volcano' });
+      const x = (w.rng.next() - 0.5) * 320;
+      const z = (w.rng.next() - 0.5) * 320;
+      w.telegraphs.push({ x, z, impactTick: w.tick + 90, radius: VOLCANO_BLAST_RADIUS, kind: 'volcano' });
       w.events.push({ kind: 'bombTelegraph', pos: [x, 0, z] });
       v.bombsLeft--;
-      v.nextBomb = w.tick + 90;
+      v.nextBomb = w.tick + 45;
     }
     if (w.tick >= v.untilTick) {
       v.state = 'cooldown';
@@ -72,9 +72,16 @@ export function stepVolcano(w: World): void {
 /** Bomb impacts leave lava (DoT) or fresh rock cover (design: both).
  * Rocks land BESIDE the crater — at the centre the creating explosion
  * would instantly destroy them. */
-export function bombAftermath(w: World, x: number, z: number): void {
-  if (w.rng.next() < 0.5) {
-    w.lavaPools.push({ x, z, radius: 2.5, untilTick: w.tick + 720 });
+export function bombAftermath(w: World, x: number, z: number, kind: 'volcano' | 'meteor' = 'volcano'): void {
+  if (kind === 'volcano') {
+    // every volcanic bomb leaves a large, long-lived burning pool
+    w.lavaPools.push({ x, z, radius: LAVA_RADIUS + w.rng.next() * 2, untilTick: w.tick + LAVA_TICKS });
+    // some impacts also throw up fresh rock cover beside the pool
+    if (w.rng.next() < 0.35) {
+      const rx = Math.max(-190, Math.min(190, x + 8));
+      const rz = Math.max(-190, Math.min(190, z + 8));
+      w.structures.push(makeStructure(w.nextId++, 'rocks', rx, rz));
+    }
   } else {
     const rx = Math.max(-190, Math.min(190, x + 3.5));
     const rz = Math.max(-190, Math.min(190, z + 3.5));

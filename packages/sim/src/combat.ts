@@ -25,6 +25,7 @@ export const PEN_COST: Record<BlockType, number> = {
   engine: 2,
   core: 3,
   ammo: 1,
+  scanner: 5, // reinforced: a standard shell can only breach one course
 };
 
 export interface Shell {
@@ -36,11 +37,24 @@ export interface Shell {
   alive: boolean;
 }
 
+export interface Blast {
+  pos: V3;
+  radius: number;
+  damage: number;
+  source: 'ammo' | 'missile' | 'bomb' | 'volcano' | 'meteor';
+}
+
+export const VOLCANO_BLAST_RADIUS = 7;
+export const VOLCANO_BLAST_DAMAGE = 6;
+export const LAVA_RADIUS = 6;
+export const LAVA_TICKS = 2400; // 40 s
+export const LAVA_DAMAGE = 2;
+
 export type SimEvent =
   | { kind: 'fire'; pos: V3; dir: V3; owner: number }
   | { kind: 'shellImpact'; pos: V3 }
   | { kind: 'blockDestroyed'; pos: V3; by: number | null }
-  | { kind: 'explosion'; pos: V3; radius: number }
+  | { kind: 'explosion'; pos: V3; radius: number; damage: number; source: Blast['source'] | 'airburst' }
   | { kind: 'chunkDetached'; id: number }
   | { kind: 'tankKilled'; id: number; pos: V3; by: number | null }
   | { kind: 'kill'; id: number; what: 'missile' | 'bomber'; by: number | null }
@@ -51,6 +65,7 @@ export type SimEvent =
   | { kind: 'volcanoErupt' }
   | { kind: 'ionStorm' }
   | { kind: 'meteorInbound'; pos: V3 }
+  | { kind: 'missileLock'; id: number; pos: V3 }
   | { kind: 'matchEnd' }
   | { kind: 'bombTelegraph'; pos: V3 }
   | { kind: 'rubbleChanged' };

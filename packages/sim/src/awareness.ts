@@ -101,6 +101,7 @@ function refresh(w: World, observer: Tank, t: Tank, source: ContactSource): void
 
 export function stepAwareness(w: World): void {
   const observers = w.tanks.filter((t) => t.alive);
+  const fullScan = w.tick % 6 === 0; // 10 Hz LOS; proximity/gunfire remain per-tick
   for (const o of observers) {
     let m = w.awareness.get(o.id);
     if (!m) {
@@ -117,7 +118,7 @@ export function stepAwareness(w: World): void {
       const d = Math.hypot(t.x - o.x, t.z - o.z);
       if (d <= PROXIMITY) {
         refresh(w, o, t, 'proximity');
-      } else if (d <= SIGHT_RANGE && hasLos(w, [o.x, 1.2, o.z], [t.x, 1.2, t.z])) {
+      } else if (fullScan && d <= SIGHT_RANGE && hasLos(w, [o.x, 1.2, o.z], [t.x, 1.2, t.z])) {
         refresh(w, o, t, 'los');
       }
     }

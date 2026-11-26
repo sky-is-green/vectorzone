@@ -8,7 +8,9 @@
 
 From the 1980 original:
 
-1. **The duel.** In solo play, one enemy at a time (plus the periodic bomber flyby). The tension is hunting a single contact on the radar, not mowing crowds.
+1. **The living arena.** Four respawning light tanks roam in FFA; exactly one
+   is director-designated to keep tracking the player. An occasional supertank
+   joins the fight. The original's tank → missile → supertank personalities remain.
 2. **The escalation ladder.** Score drives the mix: slow tanks → missiles join in → supertanks dominate at high scores.
 3. **Distinct personalities.** Slow tank: dumb, direct, sluggish. Missile: fast, committed, scary. Supertank: fast, aggressive, shoots on the move.
 4. **The periodic flyby.** A radar-invisible aircraft crosses on a schedule, warbling, worth bonus points. Ours is a bomber rather than the original's harmless saucer (§5.4) — the one deliberate departure.
@@ -53,7 +55,7 @@ Everything above lives in the shared sim, seeded → identical on host and clien
 - **Error cone**: each shot deviates within a cone (±2–6° by type). The cone **widens** with target angular velocity and range, so strafing and distance are real defenses.
 - **Ranging shots**: the first shot at a fresh contact carries extra bias; follow-ups walk toward the target (bracketing), tightening slightly on hits — capped, never perfect. It *looks* like a human finding the range.
 - **Fire discipline**: shoot only when LOS clear + alignment within tolerance + inside range + cooldown elapsed. Cooldowns 1.4–3.5 s by type.
-- **Blocked shot policy**: if an indestructible solid blocks LOS → reposition. If *destructible* cover blocks persistently → supertanks shoot through it (they have penetration too; your cover erodes under fire). Slow tanks just reposition.
+- **Blocked shot policy**: if destructible cover blocks LOS → reposition. If it persists, supertanks shoot through it (your cover erodes under fire). Slow tanks just reposition. There is no indestructible object class.
 
 ---
 
@@ -64,11 +66,15 @@ Everything above lives in the shared sim, seeded → identical on host and clien
 - **State machine**: `APPROACH` (seek preferred range, crude 3-ray whisker obstacle avoidance) → `ENGAGE` (strafe/orbit at range, aim with error, disciplined fire) → `REPOSITION` (stuck >1.5 s or LOS blocked >3 s → pick a new offset point) → back to `ENGAGE`.
 - Direct, predictable, forgiving. The tutorial opponent that never stops being useful.
 
-### 5.2 Missile — the committed threat
+### 5.2 Missile — the airborne committed threat
 
-- Spawns far away, flies fast (~2.5× player speed) with a lead solution toward your predicted position, **corrects early then commits** — a late juke beats it.
-- Small destructible entity: shoot it down for points. Explodes on impact with anything.
-- One at a time, exactly like the original. No homing forever, no terrain-following magic.
+- Spawns at the arena edge **11–16 m above ground**, visibly missile-shaped
+  (body, nose, swept fins, exhaust), and flies above the arena before diving.
+- ~60% are guided: they track a tank with a deliberately low **0.45 rad/s**
+  turn rate, so a moving tank can escape. The rest fly straight.
+- A player-targeted missile emits a **MISSILE LOCK** alert and is drawn on the
+  minimap as a pulsing red arrow. All live missiles appear as orange arrows.
+- Shoot down for points; ground/tank impact produces a real explosion.
 
 ### 5.3 Supertank — the aggressive veteran
 
@@ -79,9 +85,13 @@ Everything above lives in the shared sim, seeded → identical on host and clien
 
 ### 5.4 The bomber — the flying piñata (all modes)
 
-Less saucer, more bomber — the default in **every** mode. Every **2 minutes**, one spawns at a map edge and flies a **straight line** across the map at fixed altitude (15 m), warbling. It is a **basic aeroplane** in wireframe — fuselage, straight wings, tailplane, fin — not a saucer (user direction 2026-11-25).
+Less saucer, more bomber — the default in **every** mode. Every **2 minutes**, one spawns on the arena edge on a line **through its target tank** at fixed altitude (15 m), warbling. It is a **basic aeroplane** in wireframe — fuselage, straight wings, tailplane, fin.
 
-- **Bombs deny its flight path** on a cadence (~0.75 s between drops), plus opportunistic drops on any tank — player or AI — beneath it. Each drop is telegraphed by the universal ground ring (≥1.5 s). Dangerous if you're on its line, harmless otherwise.
+- **Minor tracking corrections** (~0.15 rad/s maximum) follow target movement,
+  but remain slow enough for the target to evade.
+- **Generous wings hitbox**: 5.5 m horizontal / 3.5 m vertical, not the thin
+  fuselage, so it is actually possible to shoot.
+- **Bombs deny its flight path** on a cadence (~0.75 s between drops), plus opportunistic drops on any tank beneath it. Each drop is telegraphed by the universal ground ring (≥1.5 s).
 - **The information trap**: it's worth bonus points, but **shooting it pings your position** — a ~3 s radar blip visible to every player, and a memory refresh for every AI (in solo, the ping feeds the AI). The points piñata that tells everyone where you are.
 - A few hits kill it (first hit claims the bonus); otherwise it despawns on exit. **Radar-invisible until it fires** — each bomb drop blips its position under the universal gunfire rule, so you can hunt it by its own bombs.
 
@@ -89,12 +99,12 @@ Less saucer, more bomber — the default in **every** mode. Every **2 minutes**,
 
 | Knob | Slow tank | Missile | Supertank |
 |---|---|---|---|
-| Hull speed | 0.5× player | 2.5× player | 1.2× player |
-| Turret slew | 45°/s | fixed forward | 120°/s |
-| Perception tick | 400 ms | 200 ms | 250 ms |
+| Hull speed | 0.5× player | 14–18 m/s, airborne | 1.2× player |
+| Turret slew | 45°/s | 0.45 rad/s guidance | 120°/s |
+| Perception tick | 400 ms | continuous, limited turn | 250 ms |
 | Base aim error | ±6° | ±3° lead error | ±2° |
 | Fire cooldown | 2.5–3.5 s | one committed shot | 1.4–2.0 s |
-| Preferred range | 60–100 m | ram | 40–80 m, flanking |
+| Preferred range | 60–100 m | dive from 11–16 m | 40–80 m, flanking |
 | Blocked-shot policy | reposition | n/a | shoot destructibles |
 | Penetration budget | standard | impact blast | high |
 
@@ -104,19 +114,17 @@ Every knob is per-map/per-mode tunable data — the "tone it down" dial is a con
 
 ## 6. The spawn director
 
-### Solo (faithful)
+### Solo / deathmatch (current)
 
-- One active enemy at a time; the bomber may overlap.
-- Score thresholds shift the mix (tanks → +missiles → supertanks), spawn interval tightens slowly with score.
-- Spawns 300–400 m out, outside the player's view, on the radar. The hunt begins.
-
-### Multiplayer deathmatch (always-on ambient pressure)
-
-- **Light tanks are always present**: up to **4 active**, respawning ~10–15 s after death, spawning far from the nearest players. They roam, engage opportunistically, and obey every fairness rule above.
-- **Target distribution**: at most **1 light tank engages a given player** at a time; the rest patrol or seek other contacts. Ambient pressure, never a firing squad.
-- **Hunter events**: every **2–3 minutes** a single supertank spawns, announced on the HUD, bonus score to whoever kills it. It hunts alongside the light tanks.
-- **Bomber** every **2 minutes**: straight-line pass, bombs anything beneath it, and shooting it pings your position to all players and AI (§5.4).
-- Ambient cap (0–4), hunter frequency, and respawn delay are host-tunable per room.
+- **Four light tanks are always maintained**, respawning on a staggered cadence.
+- **FFA**: non-tracker AI prefer other tanks when known. Exactly one living AI
+  is the designated **player tracker**, so the player always has pressure.
+- **Supertank hunter**: first at ~2.5 minutes, then every 2–3 minutes; HUD alert
+  and bonus score for the player kill.
+- **Missiles**: every 25–55 s, max three active; some target the player with a
+  lock alert and minimap tracking.
+- **Bomber** every **2 minutes**: targeted path, minor corrections, generous
+  hitbox, path-denial bombs.
 
 ### Co-op waves (later mode, same director)
 
@@ -138,4 +146,4 @@ Every knob is per-map/per-mode tunable data — the "tone it down" dial is a con
 
 ## 9. Locked choice (2026-11-25)
 
-1. **AI presence in deathmatch**: always-on ambient AI — up to 4 respawning light tanks (max 1 engaging any one player), supertank hunter events every 2–3 min, bombers every 2 min (shooting one reveals your position; the bomber runs identically in all modes). Host-tunable caps and frequencies. ✔
+1. **AI presence**: four respawning light tanks in FFA, exactly one player tracker, supertank hunter every 2–3 min, airborne missiles every 25–55 s, bomber every 2 min. ✔

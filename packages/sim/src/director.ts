@@ -1,13 +1,14 @@
 /**
- * Spawn director (AI.md §6) + bomber + missiles + hazard telegraphs.
- * Solo: one enemy at a time, score-driven escalation. Bomber every 2 min in
- * every mode: straight pass, bombs telegraphed >= 1.5 s, shooting it reveals
- * the shooter via the universal gunfire rule.
+ * Spawn director (AI.md §6) + airborne missiles + targeted bomber.
+ * Four respawning light tanks, one director-designated player hunter, FFA
+ * between the rest, an occasional supertank, and missiles that fly above
+ * the arena with limited-turn guidance. Bomber every 2 min in every mode.
  */
 import { createBrain, type AiKind } from './ai';
 import { createEnemyTank } from './tank';
-import { BOMB_DROP_TICKS } from './combat';
+import { BOMB_DROP_TICKS, VOLCANO_BLAST_RADIUS, VOLCANO_BLAST_DAMAGE } from './combat';
 import { bombAftermath } from './volcano';
+import { BLOCK_SIZE } from './grid';
 import type { World } from './world';
 import type { V3 } from './raycast';
 
@@ -18,6 +19,9 @@ export interface Missile {
   speed: number;
   age: number;
   alive: boolean;
+  targetId: number | null;
+  tracking: boolean;
+  turnRate: number; // rad/s, deliberately low so tanks can escape
 }
 
 export interface Bomber {
@@ -28,6 +32,7 @@ export interface Bomber {
   hp: number;
   alive: boolean;
   nextBomb: number;
+  targetId: number;
 }
 
 export interface Telegraph {
@@ -41,64 +46,141 @@ export interface Telegraph {
 export const SCORE_VALUES = { slow: 100, missile: 250, super: 500, bomber: 1000, block: 5 };
 export const BOMBER_PERIOD = 7200; // 2 min
 export const TELEGRAPH_TICKS = 90; // 1.5 s
+export const LIGHT_TANK_COUNT = 4;
 
 const clamp = (v: number, lo: number, hi: number): number =>
   v < lo ? lo : v > hi ? hi : v;
+const norm = (v: V3): V3 => {
+  const l = Math.hypot(v[0], v[1], v[2]) || 1;
+  return [v[0] / l, v[1] / l, v[2] / l];
+};
 
-function pickKind(score: number, r: number): AiKind | 'missile' {
-  if (score < 3000) return 'slow';
-  if (score < 7000) return r < 0.4 ? 'missile' : 'slow';
-  return r < 0.5 ? 'super' : r < 0.8 ? 'missile' : 'slow';
+/** Rotate a unit direction toward another by at most maxTurn radians. */
+function turnDir(cur: V3, want: V3, maxTurn: number): V3 {
+  const dot = clamp(cur[0] * want[0] + cur[1] * want[1] + cur[2] * want[2], -1, 1);
+  const angle = Math.acos(dot);
+  if (angle <= maxTurn || angle < 1e-6) return want;
+  const f = maxTurn / angle;
+  return norm([
+    cur[0] + (want[0] - cur[0]) * f,
+    cur[1] + (want[1] - cur[1]) * f,
+    cur[2] + (want[2] - cur[2]) * f,
+  ]);
+}
+
+function spawnPoint(w: World): { x: number; z: number } {
+  const player = w.tanks[0];
+  for (let attempt = 0; attempt < 24; attempt++) {
+    const a = w.rng.next() * Math.PI * 2;
+    const r = 100 + w.rng.next() * 40;
+    const x = clamp(player.x + Math.sin(a) * r, -190, 190);
+    const z = clamp(player.z + Math.cos(a) * r, -190, 190);
+    let clear = true;
+    for (const s of w.structures) {
+      if (!s.grid.cells.some((c) => c)) continue;
+      const hx = (s.grid.size.x * BLOCK_SIZE) / 2 + 5;
+      const hz = (s.grid.size.z * BLOCK_SIZE) / 2 + 5;
+      if (Math.abs(x - s.x) < hx && Math.abs(z - s.z) < hz) {
+        clear = false;
+        break;
+      }
+    }
+    if (clear && w.tanks.every((t) => !t.alive || Math.hypot(t.x - x, t.z - z) > 14)) {
+      return { x, z };
+    }
+  }
+  const a = w.rng.next() * Math.PI * 2;
+  return { x: Math.sin(a) * 170, z: Math.cos(a) * 170 };
+}
+
+function spawnTank(w: World, kind: AiKind): void {
+  const p = spawnPoint(w);
+  const t = createEnemyTank(w.nextId++, kind, p.x, p.z, Math.atan2(w.tanks[0].x - p.x, w.tanks[0].z - p.z));
+  t.spawnTick = w.tick;
+  w.tanks.push(t);
+  w.brains.set(t.id, createBrain(kind));
+  if (kind === 'super') w.events.push({ kind: 'superSpawn', pos: [p.x, 1, p.z] });
+}
+
+/** Exactly one living AI is the player hunter; everyone else is FFA. */
+function ensureTracker(w: World): void {
+  const living = w.tanks.filter((t) => t.id !== 0 && t.alive && w.brains.has(t.id));
+  if (!living.length) return;
+  const current = living.filter((t) => w.brains.get(t.id)!.playerTracker);
+  if (current.length === 1) return;
+  for (const t of living) w.brains.get(t.id)!.playerTracker = false;
+  const preferred = living.find((t) => w.brains.get(t.id)!.kind === 'slow') ?? living[0];
+  w.brains.get(preferred.id)!.playerTracker = true;
+}
+
+function spawnMissile(w: World): void {
+  const living = w.tanks.filter((t) => t.alive);
+  if (!living.length) return;
+  const wantsPlayer = w.rng.next() < 0.55 && living.some((t) => t.id === 0);
+  const target = wantsPlayer
+    ? w.tanks[0]
+    : living[Math.floor(w.rng.next() * living.length)];
+  const a = w.rng.next() * Math.PI * 2;
+  const pos: V3 = [Math.sin(a) * 205, 11 + w.rng.next() * 5, Math.cos(a) * 205];
+  const tracking = w.rng.next() < 0.6;
+  const dir = norm([target.x - pos[0], -0.03, target.z - pos[2]]);
+  const id = w.nextId++;
+  w.missiles.push({
+    id,
+    pos,
+    dir,
+    speed: 14 + w.rng.next() * 4,
+    age: 0,
+    alive: true,
+    targetId: target.id,
+    tracking,
+    turnRate: tracking ? 0.45 : 0, // rad/s: slow enough to dodge
+  });
+  if (target.id === 0) w.events.push({ kind: 'missileLock', id, pos });
 }
 
 export function stepDirector(w: World): void {
   if (w.phase === 'play') {
-    const activeEnemy =
-      w.tanks.some((t) => t.id !== 0 && t.alive) || w.missiles.some((m) => m.alive);
-    if (!activeEnemy && w.tick >= w.nextSpawnTick) {
-      const kind = pickKind(w.score, w.rng.next());
-      const a = w.rng.next() * Math.PI * 2;
-      // spawn INSIDE sight range so enemies acquire you and come to you
-      // (faithful to 1980); beyond it they would patrol idle forever
-      const r = 100 + w.rng.next() * 40;
-      const x = clamp(Math.sin(a) * r, -190, 190);
-      const z = clamp(Math.cos(a) * r, -190, 190);
-      if (kind === 'missile') {
-        const player = w.tanks[0];
-        const d: V3 = [player.x - x, 0, player.z - z];
-        const l = Math.hypot(d[0], d[2]) || 1;
-        w.missiles.push({
-          id: w.nextId++,
-          pos: [x, 1.2, z],
-          dir: [d[0] / l, 0, d[2] / l],
-          speed: 13,
-          age: 0,
-          alive: true,
-        });
-      } else {
-        const t = createEnemyTank(w.nextId++, kind, x, z, Math.atan2(-x, -z));
-        w.tanks.push(t);
-        w.brains.set(t.id, createBrain(kind));
-        if (kind === 'super') w.events.push({ kind: 'superSpawn', pos: [x, 1, z] });
-      }
-      w.nextSpawnTick = w.tick + Math.max(240, 900 - Math.floor(w.score / 20));
+    // maintain four light tanks; stagger replacements so the arena stays busy
+    let lights = w.tanks.filter((t) => t.alive && w.brains.get(t.id)?.kind === 'slow').length;
+    while (lights < LIGHT_TANK_COUNT && w.tick >= w.nextSpawnTick) {
+      spawnTank(w, 'slow');
+      lights++;
+      w.nextSpawnTick = w.tick + 90;
+    }
+    // one occasional supertank hunter
+    const superAlive = w.tanks.some((t) => t.alive && w.brains.get(t.id)?.kind === 'super');
+    if (!superAlive && w.tick >= w.nextSuperTick) {
+      spawnTank(w, 'super');
+      w.nextSuperTick = w.tick + 7200 + Math.floor(w.rng.next() * 3600); // 2-3 min
+    }
+    ensureTracker(w);
+    // airborne missile events, at most three active
+    if (w.tick >= w.nextMissileTick && w.missiles.filter((m) => m.alive).length < 3) {
+      spawnMissile(w);
+      w.nextMissileTick = w.tick + 1500 + Math.floor(w.rng.next() * 1800); // 25-55 s
     }
     if (!w.bomber && w.tick >= w.nextBomberTick) {
-      const a = w.rng.next() * Math.PI * 2;
-      const sx = Math.sin(a) * 210;
-      const sz = Math.cos(a) * 210;
-      const tx = -sx + (w.rng.next() - 0.5) * 60;
-      const tz = -sz + (w.rng.next() - 0.5) * 60;
-      const d: V3 = [tx - sx, 0, tz - sz];
-      const l = Math.hypot(d[0], d[2]) || 1;
+      const target = w.tanks[0].alive
+        ? w.tanks[0]
+        : w.tanks.find((t) => t.alive) ?? w.tanks[0];
+      const dx = target.x;
+      const dz = target.z;
+      const l = Math.hypot(dx, dz);
+      const a = l < 1e-6 ? w.rng.next() * Math.PI * 2 : Math.atan2(dx, dz);
+      const dir: V3 = [Math.sin(a), 0, Math.cos(a)];
+      // spawn on the arena edge on a line THROUGH the target tank
+      const sx = target.x - dir[0] * 205;
+      const sz = target.z - dir[2] * 205;
       w.bomber = {
         id: w.nextId++,
         pos: [sx, 15, sz],
-        dir: [d[0] / l, 0, d[2] / l],
+        dir,
         speed: 8,
         hp: 3,
         alive: true,
         nextBomb: w.tick + 60,
+        targetId: target.id,
       };
       w.nextBomberTick = w.tick + BOMBER_PERIOD;
       w.events.push({ kind: 'bomberInbound', pos: [sx, 15, sz] });
@@ -110,42 +192,43 @@ export function stepDirector(w: World): void {
 }
 
 function stepMissiles(w: World): void {
-  const player = w.tanks[0];
   for (const m of w.missiles) {
     if (!m.alive) continue;
     m.age++;
-    if (m.age < 60 && player.alive) {
-      // early lead correction, then commits — a late juke beats it
-      const lead: V3 = [player.x + Math.sin(player.heading) * player.speed * 0.5 - m.pos[0], 0, player.z + Math.cos(player.heading) * player.speed * 0.5 - m.pos[2]];
-      const l = Math.hypot(lead[0], lead[2]) || 1;
-      m.dir[0] += (lead[0] / l - m.dir[0]) * 0.06;
-      m.dir[2] += (lead[2] / l - m.dir[2]) * 0.06;
-      const dl = Math.hypot(m.dir[0], m.dir[2]) || 1;
-      m.dir[0] /= dl;
-      m.dir[2] /= dl;
+    const target = w.tanks.find((t) => t.id === m.targetId);
+    if (m.tracking && target?.alive) {
+      const want = norm([target.x - m.pos[0], 1.0 - m.pos[1], target.z - m.pos[2]]);
+      m.dir = turnDir(m.dir, want, m.turnRate / 60);
     }
-    m.pos[0] += m.dir[0] * m.speed * (1 / 60);
-    m.pos[2] += m.dir[2] * m.speed * (1 / 60);
-    // shot down?
+    m.pos[0] += m.dir[0] * m.speed / 60;
+    m.pos[1] += m.dir[1] * m.speed / 60;
+    m.pos[2] += m.dir[2] * m.speed / 60;
+    // shot down? full 3-D proximity
     for (const sh of w.shells) {
-      if (Math.hypot(sh.pos[0] - m.pos[0], sh.pos[2] - m.pos[2]) < 1.2) {
+      if (Math.hypot(sh.pos[0] - m.pos[0], sh.pos[1] - m.pos[1], sh.pos[2] - m.pos[2]) < 1.8) {
         m.alive = false;
         sh.alive = false;
         w.events.push({ kind: 'kill', id: m.id, what: 'missile', by: sh.owner });
-        w.events.push({ kind: 'explosion', pos: [m.pos[0], m.pos[1], m.pos[2]], radius: 1.5 });
+        w.events.push({ kind: 'explosion', pos: [m.pos[0], m.pos[1], m.pos[2]], radius: 1.5, damage: 2, source: 'airburst' });
         break;
       }
     }
     if (!m.alive) continue;
-    for (const t of w.tanks) {
-      if (!t.alive) continue;
-      if (Math.hypot(t.x - m.pos[0], t.z - m.pos[2]) < 2) {
-        m.alive = false;
-        w.pendingExplosions.push([m.pos[0], 0.5, m.pos[2]]);
-        break;
+    let hit = m.pos[1] <= 0.35;
+    if (!hit && m.pos[1] < 3) {
+      for (const t of w.tanks) {
+        if (t.alive && Math.hypot(t.x - m.pos[0], t.z - m.pos[2]) < 2.2) {
+          hit = true;
+          break;
+        }
       }
     }
-    if (Math.abs(m.pos[0]) > 210 || Math.abs(m.pos[2]) > 210) m.alive = false;
+    if (hit) {
+      m.alive = false;
+      w.pendingExplosions.push({ pos: [m.pos[0], 0.5, m.pos[2]], radius: 3, damage: 4, source: 'missile' });
+    } else if (m.age > 600 || Math.abs(m.pos[0]) > 220 || Math.abs(m.pos[2]) > 220) {
+      m.alive = false;
+    }
   }
   w.missiles = w.missiles.filter((m) => m.alive);
 }
@@ -156,9 +239,15 @@ function stepBomber(w: World): void {
     if (b && !b.alive) w.bomber = null;
     return;
   }
-  b.pos[0] += b.dir[0] * b.speed * (1 / 60);
-  b.pos[2] += b.dir[2] * b.speed * (1 / 60);
-  // bombs deny the flight path on a cadence, plus opportunistic target drops
+  const target = w.tanks.find((t) => t.id === b.targetId && t.alive) ?? w.tanks[0];
+  if (target.alive) {
+    const want: V3 = [target.x - b.pos[0], 0, target.z - b.pos[2]];
+    const l = Math.hypot(want[0], want[2]) || 1;
+    // very minor corrections: ~0.15 rad/s max, so a moving tank can evade
+    b.dir = turnDir(b.dir, [want[0] / l, 0, want[2] / l], 0.0025);
+  }
+  b.pos[0] += b.dir[0] * b.speed / 60;
+  b.pos[2] += b.dir[2] * b.speed / 60;
   if (w.tick >= b.nextBomb) {
     let tx = b.pos[0];
     let tz = b.pos[2];
@@ -174,16 +263,19 @@ function stepBomber(w: World): void {
     w.events.push({ kind: 'bombTelegraph', pos: [tx, 0, tz] });
     b.nextBomb = w.tick + BOMB_DROP_TICKS;
   }
-  // shot down? (shooting it also reveals the shooter via gunfire rule)
+  // generous airframe hitbox: wings are the target, not the 1-pixel fuselage
   for (const sh of w.shells) {
-    if (sh.pos[1] > 10 && Math.hypot(sh.pos[0] - b.pos[0], sh.pos[2] - b.pos[2]) < 2.5) {
+    if (
+      sh.pos[1] > 10 &&
+      Math.abs(sh.pos[1] - b.pos[1]) < 3.5 &&
+      Math.hypot(sh.pos[0] - b.pos[0], sh.pos[2] - b.pos[2]) < 5.5
+    ) {
       b.hp--;
       sh.alive = false;
       if (b.hp <= 0) {
         b.alive = false;
         w.events.push({ kind: 'kill', id: b.id, what: 'bomber', by: sh.owner });
-        // airburst: visible feedback that you hit it (no ground damage)
-        w.events.push({ kind: 'explosion', pos: [b.pos[0], b.pos[1], b.pos[2]], radius: 3 });
+        w.events.push({ kind: 'explosion', pos: [b.pos[0], b.pos[1], b.pos[2]], radius: 3, damage: 0, source: 'airburst' });
       }
       break;
     }
@@ -197,7 +289,14 @@ function stepTelegraphs(w: World): void {
   if (!due.length) return;
   w.telegraphs = w.telegraphs.filter((t) => w.tick < t.impactTick);
   for (const t of due) {
-    w.pendingExplosions.push([t.x, 0.5, t.z]);
-    if (t.kind === 'volcano' || t.kind === 'meteor') bombAftermath(w, t.x, t.z);
+    const volcano = t.kind === 'volcano';
+    const meteor = t.kind === 'meteor';
+    w.pendingExplosions.push({
+      pos: [t.x, 0.5, t.z],
+      radius: volcano ? VOLCANO_BLAST_RADIUS : meteor ? 4 : t.radius,
+      damage: volcano ? VOLCANO_BLAST_DAMAGE : meteor ? 5 : 3,
+      source: volcano ? 'volcano' : meteor ? 'meteor' : 'bomb',
+    });
+    if (t.kind !== 'bomb') bombAftermath(w, t.x, t.z, t.kind);
   }
 }

@@ -5,6 +5,16 @@
  * See docs/learn/m1.md for the concepts.
  */
 import * as THREE from 'three';
+import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
+import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
+import {
+  makeFatLines,
+  makeFatLinesFromPositions,
+  makeLineMaterial,
+  setLineResolution,
+  updateFatLines,
+  updateFatLinesFromArray,
+} from './fatlines';
 import {
   BLOCK_SIZE,
   createWorld,
@@ -28,6 +38,7 @@ import { ParticlePool } from './particles';
 import { createPost } from './post';
 import { buildChunkGeometry, buildRubbleGeometry, buildScenery } from './scenery';
 import { buildPanel, loadSettings, saveSettings, type Settings } from './settings';
+import { explosionShake, impactShake } from './feedback';
 import './style.css';
 
 const PHOSPHOR = 0x39ff6b;
@@ -54,7 +65,11 @@ const stats = document.getElementById('stats')!;
 
 // --- materials: the whole game is unlit -----------------------------------
 const faceMat = new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.DoubleSide });
-const edgeMat = new THREE.LineBasicMaterial({ color: PHOSPHOR });
+const edgeMat = makeLineMaterial(PHOSPHOR, 2.4); // tanks: thickest
+const objectEdgeMat = makeLineMaterial(PHOSPHOR, 1.4); // structures: middle
+const effectEdgeMat = makeLineMaterial(PHOSPHOR, 1.8); // aircraft/missiles
+const depotEdgeMat = makeLineMaterial(0xff4433, 1.8);
+const scanEdgeMat = makeLineMaterial(0x35e0ff, 1.8);
 
 // --- sim + tank visuals ----------------------------------------------------
 const settings = loadSettings();
@@ -64,14 +79,14 @@ let tank = world.tanks[0];
 interface Body {
   group: THREE.Group;
   mesh: THREE.Mesh;
-  lines: THREE.LineSegments;
+  lines: LineSegments2;
   rev: number;
 }
 
-function makeBody(grid: typeof tank.hull): Body {
+function makeBody(grid: typeof tank.hull, lineMat: LineMaterial = edgeMat): Body {
   const geo = buildEntityGeometry(grid);
   const mesh = new THREE.Mesh(geo.faces, faceMat);
-  const lines = new THREE.LineSegments(geo.edges, edgeMat);
+  const lines = makeFatLines(geo.edges, lineMat);
   const group = new THREE.Group();
   group.add(mesh, lines);
   return { group, mesh, lines, rev: grid.rev };
@@ -83,7 +98,7 @@ function refreshBody(body: Body, grid: typeof tank.hull): void {
   body.mesh.geometry.dispose();
   body.lines.geometry.dispose();
   body.mesh.geometry = geo.faces;
-  body.lines.geometry = geo.edges;
+  updateFatLines(body.lines, geo.edges);
   body.rev = grid.rev;
   rebuilds++;
 }
@@ -100,67 +115,61 @@ scene.add(hull.group);
 // --- M3: structures, rubble, chunks -----------------------------------------
 let rebuilds = 0;
 const structureBodies = new Map<number, Body>();
+const structureMat = (kind: string): LineMaterial =>
+  kind === 'depot' ? depotEdgeMat : kind === 'scan' ? scanEdgeMat : objectEdgeMat;
 for (const s of world.structures) {
-  const b = makeBody(s.grid);
+  const b = makeBody(s.grid, structureMat(s.kind));
   b.group.position.set(s.x, 0, s.z);
   scene.add(b.group);
   structureBodies.set(s.id, b);
 }
 const rubbleMat = new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.DoubleSide });
-const rubbleEdgeMat = new THREE.LineBasicMaterial({ color: 0x1d7a3a });
+const rubbleEdgeMat = makeLineMaterial(0x1d7a3a, 1.0);
 let rubbleMesh = new THREE.Mesh(new THREE.BufferGeometry(), rubbleMat);
-let rubbleLines = new THREE.LineSegments(new THREE.BufferGeometry(), rubbleEdgeMat);
+let rubbleLines = makeFatLinesFromPositions(new Float32Array(6), rubbleEdgeMat);
 // empty initial geometry has a NaN bounding sphere; never cull these
 rubbleMesh.frustumCulled = false;
 rubbleLines.frustumCulled = false;
 scene.add(rubbleMesh, rubbleLines);
 let rubbleRev = -1;
-const chunkGroups = new Map<number, THREE.LineSegments>();
-const fenceGroups = new Map<number, THREE.LineSegments>();
-const fenceMat = new THREE.LineBasicMaterial({ color: 0x39ff6b, transparent: true, opacity: 0.6 });
+const chunkGroups = new Map<number, LineSegments2>();
+const fenceGroups = new Map<number, LineSegments2>();
+const fenceMat = makeLineMaterial(0x39ff6b, 1.2, { transparent: true, opacity: 0.6 });
+const lavaMat = makeLineMaterial(0xff6b2b, 1.8, { transparent: true, opacity: 0.75 });
+const lavaLines = makeFatLinesFromPositions(new Float32Array(6), lavaMat);
+scene.add(lavaLines);
+let lavaKey = '';
+let emberAcc = 0;
 
 // M8: screen shake + ion-storm aurora
 let shakeAmp = 0;
 const auroraPos = new Float32Array(3 * 24 * 6);
-const auroraGeo = new THREE.BufferGeometry();
-auroraGeo.setAttribute('position', new THREE.BufferAttribute(auroraPos, 3).setUsage(THREE.DynamicDrawUsage));
-const auroraMat = new THREE.LineBasicMaterial({ color: 0x35e0ff, transparent: true, opacity: 0.5, fog: false });
-const aurora = new THREE.LineSegments(auroraGeo, auroraMat);
-aurora.frustumCulled = false;
+const auroraMat = makeLineMaterial(0x35e0ff, 1.1, { transparent: true, opacity: 0.5, fog: false });
+const aurora = makeFatLinesFromPositions(auroraPos, auroraMat);
 aurora.visible = false;
 scene.add(aurora);
 let meteorAcc = 0;
 
 // --- M5: enemy tanks, missiles, bomber, telegraphs, AI debug overlay --------
 const enemyBodies = new Map<number, { hull: Body; turret: Body }>();
-const missileGroups = new Map<number, THREE.LineSegments>();
-let bomberGroup: THREE.LineSegments | null = null;
+const missileGroups = new Map<number, LineSegments2>();
+let bomberGroup: LineSegments2 | null = null;
 let debugAi = false;
 window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyX') debugAi = !debugAi;
 });
-const debugGeo = new THREE.BufferGeometry();
 const debugPos = new Float32Array(4096);
-debugGeo.setAttribute(
-  'position',
-  new THREE.BufferAttribute(debugPos, 3).setUsage(THREE.DynamicDrawUsage),
+const debugLines = makeFatLinesFromPositions(
+  new Float32Array(6),
+  makeLineMaterial(0xff4433, 1.0, { transparent: true, opacity: 0.7 }),
 );
-debugGeo.setDrawRange(0, 0);
-const debugLines = new THREE.LineSegments(
-  debugGeo,
-  new THREE.LineBasicMaterial({ color: 0xff4433, transparent: true, opacity: 0.7 }),
-);
-debugLines.frustumCulled = false;
 debugLines.visible = false;
 scene.add(debugLines);
 
 // line-of-fire: predicted trajectory + impact tick (user direction 2026-11-25)
-const trajMat = new THREE.LineBasicMaterial({ color: 0x1d7a3a, transparent: true, opacity: 0.5 });
+const trajMat = makeLineMaterial(0x1d7a3a, 0.9, { transparent: true, opacity: 0.5 });
 const trajPos = new Float32Array(18);
-const trajGeo = new THREE.BufferGeometry();
-trajGeo.setAttribute('position', new THREE.BufferAttribute(trajPos, 3).setUsage(THREE.DynamicDrawUsage));
-const trajLines = new THREE.LineSegments(trajGeo, trajMat);
-trajLines.frustumCulled = false;
+const trajLines = makeFatLinesFromPositions(trajPos, trajMat);
 scene.add(trajLines);
 
 const hud = createHud();
@@ -205,9 +214,24 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyR' && world.phase === 'over') location.reload();
 });
 
-function crossGeometry(size: number): THREE.BufferGeometry {
-  const s = size;
-  const p = [-s, 0, 0, s, 0, 0, 0, 0, -s, 0, 0, s, 0, -s, 0, 0, s, 0];
+function missileGeometry(): THREE.BufferGeometry {
+  // local +Z: long body, pointed nose, swept fins, exhaust
+  const p = [
+    0, 0, 2.2, 0, 0, -1.6,
+    0, 0, 2.2, -0.45, 0, 1.2,
+    0, 0, 2.2, 0.45, 0, 1.2,
+    0, 0, 2.2, 0, 0.45, 1.2,
+    0, 0, 2.2, 0, -0.45, 1.2,
+    -0.45, 0, 1.2, -0.9, 0, 0.2,
+    0.45, 0, 1.2, 0.9, 0, 0.2,
+    0, 0.45, 1.2, 0, 0.9, 0.2,
+    0, -0.45, 1.2, 0, -0.9, 0.2,
+    -0.9, 0, 0.2, -0.9, 0, -0.7,
+    0.9, 0, 0.2, 0.9, 0, -0.7,
+    0, 0.9, 0.2, 0, 0.9, -0.7,
+    0, -0.9, 0.2, 0, -0.9, -0.7,
+    0, 0, -1.6, 0, 0, -2.6,
+  ];
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3));
   return g;
@@ -270,7 +294,10 @@ function applySettings(s: Settings): void {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2) * s.res);
   renderer.setSize(window.innerWidth, window.innerHeight);
   post.resize(window.innerWidth, window.innerHeight);
+  setLineResolution(window.innerWidth, window.innerHeight);
   edgeMat.color.setHex(P.world);
+  objectEdgeMat.color.setHex(P.world);
+  effectEdgeMat.color.setHex(P.world);
   rubbleEdgeMat.color.setHex(P.rubble);
   trajMat.color.setHex(P.dim);
   scen.mountainMat.color.setHex(P.dim);
@@ -431,22 +458,33 @@ function frame(now: number): void {
   refreshBody(hull, tank.hull);
   refreshBody(turret, tank.turret);
 
-  // dormant volcano smoke: ~3 wisps/sec, cosmetic randomness lives client-side
+  // volcano steam/ash: subtle when dormant, a column during rumble, a thick
+  // eruption plume with embers when active
+  const vs = world.volcano.state;
+  const smokeRate = vs === 'erupt' ? 50 : vs === 'rumble' ? 18 : vs === 'cooldown' ? 10 : 3;
   smokeAcc += dt;
-  while (smokeAcc > 1 / 3) {
-    smokeAcc -= 1 / 3;
+  while (smokeAcc >= 1 / smokeRate) {
+    smokeAcc -= 1 / smokeRate;
+    const erupting = vs === 'erupt';
+    const spread = erupting ? 45 : vs === 'rumble' ? 28 : 12;
+    const ember = erupting && Math.random() < 0.4;
     smoke.spawn(
-      scen.crater.x + (Math.random() - 0.5) * 14,
-      scen.crater.y,
-      scen.crater.z + (Math.random() - 0.5) * 14,
-      (Math.random() - 0.5) * 2,
-      4 + Math.random() * 3,
-      (Math.random() - 0.5) * 2,
-      5 + Math.random() * 2,
-      tint.smoke[0], tint.smoke[1], tint.smoke[2],
-      1.4,
+      scen.crater.x + (Math.random() - 0.5) * spread,
+      scen.crater.y + (Math.random() - 0.5) * 8,
+      scen.crater.z + (Math.random() - 0.5) * spread,
+      (Math.random() - 0.5) * (erupting ? 12 : 4) + (erupting ? 6 : 0),
+      (erupting ? 16 : 6) + Math.random() * (erupting ? 14 : 5),
+      (Math.random() - 0.5) * (erupting ? 12 : 4),
+      (erupting ? 10 : 5) + Math.random() * (erupting ? 8 : 4),
+      ember ? tint.hazard[0] : tint.smoke[0] * 1.4,
+      ember ? tint.hazard[1] : tint.smoke[1] * 1.4,
+      ember ? tint.hazard[2] : tint.smoke[2] * 1.4,
+      (erupting ? 12 : vs === 'rumble' ? 6 : 2.5) + Math.random() * (erupting ? 18 : 5),
     );
   }
+  scen.volcanoMat.color.setHex(
+    vs === 'erupt' ? 0xff6b2b : vs === 'rumble' ? 0x8a4a20 : PALETTES[settings.palette % PALETTES.length].dim,
+  );
   smoke.update(dt);
 
   // --- M3 sync: structures, rubble, chunks, dead tank ------------------------
@@ -455,7 +493,7 @@ function frame(now: number): void {
     let b = structureBodies.get(s.id);
     if (!b) {
       // eruption rock clusters arrive mid-match: create their body on first sight
-      b = makeBody(s.grid);
+      b = makeBody(s.grid, structureMat(s.kind));
       b.group.position.set(s.x, 0, s.z);
       scene.add(b.group);
       structureBodies.set(s.id, b);
@@ -468,13 +506,13 @@ function frame(now: number): void {
     rubbleMesh.geometry.dispose();
     rubbleLines.geometry.dispose();
     rubbleMesh.geometry = g.faces;
-    rubbleLines.geometry = g.edges;
+    updateFatLines(rubbleLines, g.edges);
     rebuilds++;
   }
   for (const ch of world.chunks) {
     let g = chunkGroups.get(ch.id);
     if (!g) {
-      g = new THREE.LineSegments(buildChunkGeometry(ch.cells), edgeMat);
+      g = makeFatLines(buildChunkGeometry(ch.cells), rubbleEdgeMat);
       chunkGroups.set(ch.id, g);
       scene.add(g);
     }
@@ -527,12 +565,13 @@ function frame(now: number): void {
   for (const m of world.missiles) {
     let g = missileGroups.get(m.id);
     if (!g) {
-      g = new THREE.LineSegments(crossGeometry(0.7), edgeMat);
+      g = makeFatLines(missileGeometry(), effectEdgeMat);
       missileGroups.set(m.id, g);
       scene.add(g);
     }
     g.position.set(m.pos[0], m.pos[1], m.pos[2]);
-    g.rotation.y = Math.atan2(m.dir[0], m.dir[2]);
+    const dir = new THREE.Vector3(m.dir[0], m.dir[1], m.dir[2]).normalize();
+    g.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
   }
   for (const [id, g] of missileGroups) {
     if (!world.missiles.some((m) => m.id === id)) {
@@ -543,7 +582,7 @@ function frame(now: number): void {
   }
   if (world.bomber) {
     if (!bomberGroup) {
-      bomberGroup = new THREE.LineSegments(bomberGeometry(), edgeMat);
+      bomberGroup = makeFatLines(bomberGeometry(), effectEdgeMat);
       scene.add(bomberGroup);
     }
     bomberGroup.position.set(world.bomber.pos[0], world.bomber.pos[1], world.bomber.pos[2]);
@@ -556,14 +595,30 @@ function frame(now: number): void {
   // telegraph rings pulse while a bomb is inbound (>= 1.5 s warning)
   for (const tg of world.telegraphs) {
     const pulse = 0.5 + 0.5 * Math.sin(now / 90);
-    for (let i = 0; i < 16; i++) {
-      const a = (i / 16) * Math.PI * 2;
+    const ringSegments = tg.kind === 'volcano' ? 32 : 16;
+    for (let i = 0; i < ringSegments; i++) {
+      const a = (i / ringSegments) * Math.PI * 2;
       smoke.spawn(
         tg.x + Math.sin(a) * tg.radius, 0.05, tg.z + Math.cos(a) * tg.radius,
         0, 0, 0,
-        0.12, tint.hazard[0] * pulse, tint.hazard[1] * pulse, tint.hazard[2] * pulse, 0.5,
+        0.12, tint.hazard[0] * pulse, tint.hazard[1] * pulse, tint.hazard[2] * pulse, tg.kind === 'volcano' ? 1.2 : 0.5,
         Math.cos(a), 0, -Math.sin(a),
       );
+    }
+    // visible falling projectile: volcanic bombs arc down from high above
+    if (tg.kind === 'volcano' || tg.kind === 'meteor') {
+      const remain = Math.max(0, tg.impactTick - world.tick);
+      const fall = 1 - remain / 90;
+      const y = 85 * (1 - fall) * (1 - fall) + 1;
+      for (let j = 0; j < 7; j++) {
+        smoke.spawn(
+          tg.x + Math.sin(j * 0.7 + now / 200) * 0.5,
+          y + j * 1.4,
+          tg.z + Math.cos(j * 0.7 + now / 200) * 0.5,
+          -1.5, -22, -1.5,
+          0.25, tint.hazard[0], tint.hazard[1], tint.hazard[2], 2.2,
+        );
+      }
     }
   }
   // energy fence curtains: shimmering vertical dashes between live pylons
@@ -582,9 +637,7 @@ function frame(now: number): void {
       }
       p.push(f.ax, f.height, f.az, f.bx, f.height, f.bz);
       p.push(f.ax, 0.05, f.az, f.bx, 0.05, f.bz);
-      const geo = new THREE.BufferGeometry();
-      geo.setAttribute('position', new THREE.Float32BufferAttribute(p, 3));
-      g = new THREE.LineSegments(geo, fenceMat);
+      g = makeFatLinesFromPositions(p, fenceMat);
       fenceGroups.set(f.id, g);
       scene.add(g);
     } else if (!alive && g) {
@@ -610,7 +663,7 @@ function frame(now: number): void {
         auroraPos[n++] = Math.sin(a1) * 520; auroraPos[n++] = y1; auroraPos[n++] = Math.cos(a1) * 520;
       }
     }
-    (auroraGeo.attributes.position as THREE.BufferAttribute).needsUpdate = true;
+    updateFatLinesFromArray(aurora, auroraPos);
     auroraMat.opacity = 0.3 + 0.25 * Math.sin(now / 300);
   }
   if (world.sky.meteors) {
@@ -627,18 +680,40 @@ function frame(now: number): void {
   }
   shakeAmp *= Math.exp(-dt * 6);
 
-  // lava pools pulse hazard-orange while they burn
-  for (const pool of world.lavaPools) {
-    const pulse = 0.5 + 0.5 * Math.sin(now / 120);
-    for (let i = 0; i < 10; i++) {
-      const a = (i / 10) * Math.PI * 2 + now / 900;
-      smoke.spawn(
-        pool.x + Math.sin(a) * pool.radius, 0.06, pool.z + Math.cos(a) * pool.radius,
-        0, 0.6, 0,
-        0.14, tint.hazard[0] * pulse, tint.hazard[1] * pulse, tint.hazard[2] * pulse, 0.6,
-        Math.cos(a), 0, -Math.sin(a),
-      );
+  // lava pools: one thick-line mesh (rebuilt only when pools change), plus
+  // sparse rising embers. Never spawn hundreds of ring particles per frame.
+  const key = world.lavaPools.map((p) => `${p.x.toFixed(1)},${p.z.toFixed(1)},${p.radius.toFixed(1)},${p.untilTick}`).join('|');
+  if (key !== lavaKey) {
+    lavaKey = key;
+    const pos: number[] = [];
+    for (const pool of world.lavaPools) {
+      for (let ring = 0; ring < 2; ring++) {
+        const r = pool.radius * (ring === 0 ? 1 : 0.55);
+        for (let i = 0; i < 32; i++) {
+          const a = (i / 32) * Math.PI * 2;
+          const b = ((i + 1) / 32) * Math.PI * 2;
+          pos.push(
+            pool.x + Math.sin(a) * r, 0.07, pool.z + Math.cos(a) * r,
+            pool.x + Math.sin(b) * r, 0.07, pool.z + Math.cos(b) * r,
+          );
+        }
+      }
     }
+    updateFatLinesFromArray(lavaLines, pos.length ? pos : new Float32Array(6));
+    lavaLines.visible = world.lavaPools.length > 0;
+  }
+  lavaMat.opacity = 0.55 + 0.25 * Math.sin(now / 180);
+  emberAcc += dt;
+  while (emberAcc > 0.12 && world.lavaPools.length) {
+    emberAcc -= 0.12;
+    const pool = world.lavaPools[Math.floor(Math.random() * world.lavaPools.length)];
+    smoke.spawn(
+      pool.x + (Math.random() - 0.5) * pool.radius,
+      0.1,
+      pool.z + (Math.random() - 0.5) * pool.radius,
+      (Math.random() - 0.5) * 1.5, 3 + Math.random() * 4, (Math.random() - 0.5) * 1.5,
+      0.8, tint.hazard[0], tint.hazard[1], tint.hazard[2], 0.7,
+    );
   }
   // AI debug overlay: intent, LOS, aim cone (X toggles)
   debugLines.visible = debugAi;
@@ -664,8 +739,7 @@ function frame(now: number): void {
         }
       }
     }
-    debugGeo.setDrawRange(0, n / 3);
-    (debugGeo.attributes.position as THREE.BufferAttribute).needsUpdate = true;
+    updateFatLinesFromArray(debugLines, debugPos.subarray(0, n));
   }
 
   // combat events → particles & scorch rings
@@ -679,10 +753,14 @@ function frame(now: number): void {
     else if (ev.kind === 'scanPing') hud.alert('SCAN PING');
     else if (ev.kind === 'ionStorm') hud.alert('ION STORM — RADAR DOWN');
     else if (ev.kind === 'meteorInbound') hud.alert('METEOR INBOUND');
+    else if (ev.kind === 'missileLock') hud.alert('MISSILE LOCK');
     else if (ev.kind === 'bombTelegraph') lastBombBlip = now;
-    if (ev.kind === 'fire') shakeAmp = Math.min(0.5, shakeAmp + 0.04);
-    if (ev.kind === 'explosion') shakeAmp = Math.min(0.8, shakeAmp + 0.2);
-    if (ev.kind === 'tankKilled') shakeAmp = Math.min(1, shakeAmp + 0.4);
+    if (ev.kind === 'fire' && ev.owner === 0) shakeAmp = Math.min(0.35, shakeAmp + 0.035);
+    if (ev.kind === 'explosion') {
+      const d = Math.hypot(ev.pos[0] - tank.x, ev.pos[2] - tank.z);
+      shakeAmp = Math.min(1, shakeAmp + explosionShake(d, ev.radius, ev.source));
+    }
+    if (ev.kind === 'tankKilled' && ev.id === 0) shakeAmp = Math.min(0.8, shakeAmp + 0.3);
     // killfeed + directional hit flash
     if (ev.kind === 'tankKilled') {
       if (ev.id === 0) {
@@ -695,6 +773,7 @@ function frame(now: number): void {
     }
     if (ev.kind === 'blockDestroyed' && ev.by !== 0 && Math.hypot(ev.pos[0] - tank.x, ev.pos[2] - tank.z) < 4) {
       hitFlash = { angle: Math.atan2(ev.pos[0] - tank.x, ev.pos[2] - tank.z) - tank.heading, born: now };
+      shakeAmp = Math.min(0.5, shakeAmp + impactShake(Math.hypot(ev.pos[0] - tank.x, ev.pos[2] - tank.z)));
     }
     if (ev.kind === 'explosion' && Math.hypot(ev.pos[0] - tank.x, ev.pos[2] - tank.z) < 6) {
       hitFlash = { angle: Math.atan2(ev.pos[0] - tank.x, ev.pos[2] - tank.z) - tank.heading, born: now };
@@ -727,7 +806,7 @@ function frame(now: number): void {
         );
       }
     } else if (ev.kind === 'explosion') {
-      scorch(ev.pos[0], ev.pos[2], ev.radius);
+      if (ev.pos[1] < 5) scorch(ev.pos[0], ev.pos[2], ev.radius);
       for (let i = 0; i < 40; i++) {
         const a = Math.random() * Math.PI * 2;
         const s = 4 + Math.random() * 8;
@@ -801,7 +880,7 @@ function frame(now: number): void {
     trajPos[9] = tr.pos[0] + s; trajPos[10] = tr.pos[1]; trajPos[11] = tr.pos[2];
     trajPos[12] = tr.pos[0]; trajPos[13] = tr.pos[1]; trajPos[14] = tr.pos[2] - s;
     trajPos[15] = tr.pos[0]; trajPos[16] = tr.pos[1]; trajPos[17] = tr.pos[2] + s;
-    (trajGeo.attributes.position as THREE.BufferAttribute).needsUpdate = true;
+    updateFatLinesFromArray(trajLines, trajPos);
     trajLines.visible = true;
   } else {
     trajLines.visible = false;
@@ -809,7 +888,13 @@ function frame(now: number): void {
 
   // HUD: band + radar + reticle + alerts
   const superIds = new Set<number>();
-  for (const [id, b] of world.brains) if (b.kind === 'super') superIds.add(id);
+  const tankHeadings = new Map<number, number>();
+  for (const t of world.tanks) {
+    tankHeadings.set(t.id, t.heading);
+    const b = world.brains.get(t.id);
+    if (b?.kind === 'super') superIds.add(t.id);
+  }
+  const scanner = world.structures.find((s) => s.kind === 'scan' && s.grid.cells.some((c) => c));
   hud.draw({
     tick: world.tick,
     heading: tank.heading,
@@ -817,12 +902,26 @@ function frame(now: number): void {
     x: tank.x,
     z: tank.z,
     known: world.awareness.get(0),
+    tankHeadings,
+    missiles: world.missiles.map((m) => ({
+      id: m.id,
+      x: m.pos[0],
+      z: m.pos[2],
+      heading: Math.atan2(m.dir[0], m.dir[2]),
+      targeted: m.targetId === 0,
+    })),
+    scanner: scanner ? { x: scanner.x, z: scanner.z } : null,
+    bomber: world.bomber ? {
+      x: world.bomber.pos[0],
+      z: world.bomber.pos[2],
+      heading: Math.atan2(world.bomber.dir[0], world.bomber.dir[2]),
+    } : null,
+    bomberBlip: now - lastBombBlip < 3000,
     superIds,
     storm: world.stormUntil > world.tick,
     score: world.score,
     lives: world.lives,
     cooldownFrac: 1 - Math.min(1, tank.cooldown / SHELL_COOLDOWN),
-    bomberBlip: now - lastBombBlip < 3000,
     secondsLeft: Math.max(0, (MATCH_TICKS - world.tick) / 60),
     palette: PALETTES[settings.palette % PALETTES.length],
     alive: tank.alive,
@@ -854,4 +953,5 @@ window.addEventListener('resize', () => {
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
   post.resize(window.innerWidth, window.innerHeight);
+  setLineResolution(window.innerWidth, window.innerHeight);
 });

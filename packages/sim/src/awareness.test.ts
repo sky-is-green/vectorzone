@@ -12,6 +12,10 @@ function twoTanks(dist: number, kind: 'slow' | 'super' = 'slow') {
   w.tanks.push(e);
   w.brains.set(1, createBrain('slow'));
   w.tanks[0].spawnTick = -1000;
+  w.nextSpawnTick = 1e9;
+  w.nextSuperTick = 1e9;
+  w.nextMissileTick = 1e9;
+  w.nextBomberTick = 1e9;
   return w;
 }
 
@@ -25,7 +29,7 @@ describe('awareness rules (RADAR.md)', () => {
 
   it('beyond 30 m with clear LOS: known by sight', () => {
     const w = twoTanks(60);
-    stepWorld(w);
+    for (let i = 0; i < 6; i++) stepWorld(w);
     expect(w.awareness.get(0)?.get(1)?.source).toBe('los');
   });
 
@@ -58,7 +62,7 @@ describe('awareness rules (RADAR.md)', () => {
 
   it('memory: last-seen persists 5 s after LOS breaks, then drops', () => {
     const w = twoTanks(60);
-    stepWorld(w);
+    for (let i = 0; i < 6; i++) stepWorld(w);
     expect(w.awareness.get(0)?.get(1)?.source).toBe('los');
     // break LOS with a tower between them; the ghost must hold 5 s.
     // Freeze the enemy (no brain) so it cannot drive back into sight.
@@ -86,7 +90,7 @@ describe('awareness rules (RADAR.md)', () => {
     stepWorld(w);
     expect(w.awareness.get(0)?.get(1)).toBeUndefined();
     w.stormUntil = 0;
-    stepWorld(w);
+    for (let i = 0; i < 6; i++) stepWorld(w);
     expect(w.awareness.get(0)?.get(1)?.source).toBe('los');
   });
 });

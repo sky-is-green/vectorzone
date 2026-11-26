@@ -4,16 +4,18 @@
  * silhouette stays crisp while the arena floor fades (ENVIRONMENTS §2).
  */
 import * as THREE from 'three';
+import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 import { BLOCK_SIZE, type RubbleCell } from '@vectorzone/sim';
+import { makeFatLinesFromPositions, makeLineMaterial } from './fatlines';
 
 const DIM = 0x1d7a3a;
 const TAU = Math.PI * 2;
 
 export interface Scenery {
   crater: THREE.Vector3;
-  mountainMat: THREE.LineBasicMaterial;
-  volcanoMat: THREE.LineBasicMaterial;
-  moonMat: THREE.LineBasicMaterial;
+  mountainMat: LineMaterial;
+  volcanoMat: LineMaterial;
+  moonMat: LineMaterial;
   makeGrid: (center: number, grid: number) => THREE.GridHelper;
 }
 
@@ -35,8 +37,14 @@ export function buildScenery(scene: THREE.Scene): Scenery {
   }
   const mgeo = new THREE.BufferGeometry();
   mgeo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
-  const mountainMat = new THREE.LineBasicMaterial({ color: DIM, fog: false });
-  scene.add(new THREE.LineLoop(mgeo, mountainMat));
+  const mseg: number[] = [];
+  for (let i = 0; i < N; i++) {
+    const a = i * 3;
+    const b = ((i + 1) % N) * 3;
+    mseg.push(pts[a], pts[a + 1], pts[a + 2], pts[b], pts[b + 1], pts[b + 2]);
+  }
+  const mountainMat = makeLineMaterial(DIM, 1.1, { fog: false });
+  scene.add(makeFatLinesFromPositions(mseg, mountainMat));
 
   // volcano: wireframe cone with a crater notch, on the horizon
   const a0 = 0.9;
@@ -60,10 +68,8 @@ export function buildScenery(scene: THREE.Scene): Scenery {
       seg.push(vx + Math.sin(a) * r1, h1, vz + Math.cos(a) * r1, vx + Math.sin(a) * r2, h2, vz + Math.cos(a) * r2);
     }
   }
-  const vgeo = new THREE.BufferGeometry();
-  vgeo.setAttribute('position', new THREE.Float32BufferAttribute(seg, 3));
-  const volcanoMat = new THREE.LineBasicMaterial({ color: DIM, fog: false });
-  scene.add(new THREE.LineSegments(vgeo, volcanoMat));
+  const volcanoMat = makeLineMaterial(DIM, 1.2, { fog: false });
+  scene.add(makeFatLinesFromPositions(seg, volcanoMat));
   const crater = new THREE.Vector3(vx, 78, vz);
 
   // crescent moon: outer arc + offset inner arc, closed
@@ -77,10 +83,14 @@ export function buildScenery(scene: THREE.Scene): Scenery {
     const t = Math.PI * 0.25 + (i / 40) * Math.PI * 1.5;
     mp.push(cx + 6 + Math.cos(t) * R * 0.92, cy + Math.sin(t) * R * 0.92, cz);
   }
-  const moongeo = new THREE.BufferGeometry();
-  moongeo.setAttribute('position', new THREE.Float32BufferAttribute(mp, 3));
-  const moonMat = new THREE.LineBasicMaterial({ color: 0x9fffc0, fog: false });
-  scene.add(new THREE.LineLoop(moongeo, moonMat));
+  const moonSeg: number[] = [];
+  for (let i = 0; i < mp.length / 3 - 1; i++) {
+    const a = i * 3;
+    const b = a + 3;
+    moonSeg.push(mp[a], mp[a + 1], mp[a + 2], mp[b], mp[b + 1], mp[b + 2]);
+  }
+  const moonMat = makeLineMaterial(0x9fffc0, 1.2, { fog: false });
+  scene.add(makeFatLinesFromPositions(moonSeg, moonMat));
 
   return { crater, mountainMat, volcanoMat, moonMat, makeGrid };
 }

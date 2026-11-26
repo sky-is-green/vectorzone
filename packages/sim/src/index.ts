@@ -60,9 +60,15 @@ export {
   EXPLOSION_DAMAGE,
   RUBBLE_CAP,
   CHUNK_SETTLE_TICKS,
+  VOLCANO_BLAST_RADIUS,
+  VOLCANO_BLAST_DAMAGE,
+  LAVA_RADIUS,
+  LAVA_TICKS,
+  LAVA_DAMAGE,
   PEN_COST,
   type Shell,
   type SimEvent,
+  type Blast,
 } from './combat';
 export {
   CLASSIC_STRUCTURES,

@@ -45,9 +45,12 @@ DORMANT ──► RUMBLE ──► ERUPT ──► COOLDOWN ──► DORMANT
 
 - **DORMANT**: thin smoke wisps (rising line particles), occasional ember flicker at the crater. The mountain glows faintly at its peak.
 - **RUMBLE** (telegraph): low synthesized rumble, micro screen-shake, crater glow brightens to orange, smoke thickens. Players *know* it's coming.
-- **ERUPT**: ballistic lava arcs — glowing orange line particles with trails. Most are spectacle, but **2–5 bombs per eruption are real sim projectiles** that arc into the arena:
+- **ERUPT**: a dense, wide steam/ash plume with embers and a hot crater. **10–16
+  real sim projectiles** arc across the arena during a 10 s sustained eruption:
   - Each target gets a **fading-in ground ring ~2 s before impact** (the universal hazard telegraph).
-  - Impact: small explosion damage radius, then either a **lava pool** (burning zone, ~12 s, damage-over-time to tanks standing in it) or a **volcanic rock cluster** — fresh destructible cover deposited mid-match. The battlefield literally rearranges itself.
+  - Impact: **7 m blast radius / 6 damage**, then a **6–8 m lava pool lasting
+    40 s** (2 damage every 0.5 s); 35% of impacts also deposit fresh rock cover.
+    The battlefield literally rearranges itself and stays deadly.
 - **COOLDOWN**: fading glow, drifting ash across the arena, embers dying out.
 
 **Palette rule:** the world is green; **orange/red is reserved for hazards** (lava, explosions, warning rings). Instant readability, and it echoes the original's red HUD band.
@@ -91,7 +94,11 @@ Same block grid, same types where sensible (`hull`, `ammo`, `core`-like anchor c
 
 ### 4.2 Reactive props (destruction with consequences)
 
-- **Scan tower**: rotating dish, blinking beacon. While alive, it **pings every tank's position onto everyone's radar every ~10 s** — the only way to see distant, silent players. Destroy it → radar falls back to gunfire blips and the 30 m proximity ring. A soft objective that rewards aggression and gives snipers a reason to exist. (AI awareness mirrors the same rules.)
+- **Scan tower**: large **blue** reinforced objective (7×7 footprint, 11 high,
+  scanner blocks hp 6 / penetration cost 5). Its radar role makes it worth
+  finding and killing; the color/size make it unmistakable.
+- **Explosive depots**: rendered **red** so their chain-reaction role is visible
+  before the first shot.
 - **Radar dish / antenna**: idle rotation; shot off → topples via structural integrity, local AI accuracy drops for ~15 s.
 - **Beacon tower**: blinking light, pure atmosphere + tall collapse hazard.
 
@@ -119,7 +126,8 @@ One sim system schedules everything:
 
 **Balance rules:**
 
-1. Hazard damage is area-denial, not spam: 2–5 bombs per eruption, eruptions minutes apart.
+1. Hazard damage is area-denial, not spam: 10–16 telegraphed projectiles per
+   eruption, eruptions roughly a minute apart in the final two minutes.
 2. Every damaging hazard shows the ground ring ≥1.5 s ahead, plus audio.
 3. Environment kills are neutral (no score awarded) — the zone is a third faction.
 4. Fresh rock/rubble from events is destructible like everything else: the world's gifts can be taken away again.
@@ -141,7 +149,11 @@ Arenas are JSON-ish layouts (object placements + block grids + event profile), s
 
 ## 7. Performance budget (environment share)
 
-- Global line-particle pool: **1,024 segments**, shared by smoke, sparks, lava, ash, debris.
+- **Line hierarchy** (`Line2`, real pixel widths): floor 1 px (thinnest), tanks
+  2.4 px (thickest), structures 1.4 px, aircraft/missiles 1.8 px, rubble 1 px,
+  horizon 1.1–1.2 px, trajectory 0.9 px.
+- Global line-particle pool: **1,024 segments**, shared by smoke, sparks, ash,
+  embers, debris. Lava rings are one pooled thick-line mesh, not per-frame particles.
 - ≤ ~24 block structures per arena, each merged to **2 draw calls** (faces + edges); rubble merged arena-wide into 1–2 more.
 - Horizon: one line-strip mesh + one volcano emitter. Sky events reuse the particle pool.
 - Scorch decals: pooled, ≤ 30. Idle animations: a handful of rotating/blinking objects + one shader time uniform.
