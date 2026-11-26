@@ -3,7 +3,7 @@ import { createWorld, stepWorld } from './world';
 import { createEnemyTank } from './tank';
 import { createBrain } from './ai';
 import { makeStructure } from './structure';
-import { GRACE_TICKS, GUNFIRE_TICKS, MEMORY_TICKS, PROXIMITY } from './awareness';
+import { GRACE_TICKS, GUNFIRE_TICKS, MEMORY_TICKS, PROXIMITY, recentAttackers, stepAwareness } from './awareness';
 
 function twoTanks(dist: number, kind: 'slow' | 'super' = 'slow') {
   const w = createWorld(1);
@@ -92,6 +92,32 @@ describe('awareness rules (RADAR.md)', () => {
     w.stormUntil = 0;
     for (let i = 0; i < 6; i++) stepWorld(w);
     expect(w.awareness.get(0)?.get(1)?.source).toBe('los');
+  });
+
+  it('tracks multiple observed attackers independently and expires them', () => {
+    const w = twoTanks(60);
+    const other = createEnemyTank(2, 'slow', 60, 0, -Math.PI / 2);
+    other.spawnTick = -1000;
+    w.tanks.push(other);
+    w.events = [
+      { kind: 'fire', owner: 1, pos: [0, 1.2, 58], dir: [0, 0, -1] },
+      { kind: 'fire', owner: 2, pos: [58, 1.2, 0], dir: [-1, 0, 0] },
+    ];
+    stepAwareness(w);
+    expect(recentAttackers(w, 0).sort()).toEqual([1, 2]);
+    w.tick += GUNFIRE_TICKS + 1;
+    w.events = [];
+    stepAwareness(w);
+    expect(recentAttackers(w, 0)).toEqual([]);
+  });
+
+  it('does not infer incoming fire from another AI private target choice', () => {
+    const w = twoTanks(60);
+    const brain = w.brains.get(1)!;
+    brain.targetId = 0;
+    brain.nextThink = 1e9; // execute patrol only; no shot is fired
+    stepWorld(w);
+    expect(recentAttackers(w, 0)).toEqual([]);
   });
 
   it('awareness records turret angle for radar orientation', () => {

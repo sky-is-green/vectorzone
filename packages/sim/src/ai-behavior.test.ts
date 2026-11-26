@@ -4,6 +4,7 @@ import { createEnemyTank, type TankCommand } from './tank';
 import { createBrain, thinkBrain } from './ai';
 import { getCell, setCell } from './grid';
 import { makeStructure } from './structure';
+import { hasLos } from './awareness';
 import { SELF_DESTRUCT_TICKS } from './combat';
 
 const N: TankCommand = { throttle: 0, turn: 0, turretYaw: 0, gunPitch: 0, fire: false };
@@ -30,6 +31,10 @@ function stripGun(t: ReturnType<typeof createEnemyTank>): void {
         if (getCell(t.turret, x, y, z)?.type === 'gun') setCell(t.turret, x, y, z, null);
 }
 
+function incoming(w: ReturnType<typeof createWorld>, targetId: number, attackers: number[]): void {
+  w.incomingFire.set(targetId, new Map(attackers.map((id) => [id, w.tick])));
+}
+
 describe('AI aim & hysteresis', () => {
   it('defaults to a low hull aim point and negative gun pitch', () => {
     let hullAims = 0;
@@ -54,6 +59,16 @@ describe('AI aim & hysteresis', () => {
     expect(cmd.gunPitch).toBeLessThan(0);
   });
 
+  it('leads a visible moving target instead of aiming at its current position', () => {
+    const w = duel(70, 'slow');
+    w.tanks[0].heading = Math.PI / 2;
+    w.tanks[0].speed = 6;
+    const brain = w.brains.get(1)!;
+    thinkBrain(w, brain, w.tanks[1]);
+    expect(brain.aim!.x).toBeGreaterThan(1);
+    expect(brain.aim!.z).toBeCloseTo(0);
+  });
+
   it('holds a stable range band instead of flipping movement at the fringe', () => {
     const w = duel(85, 'super'); // just beyond high=80, inside hold margin
     const brain = w.brains.get(1)!;
@@ -70,13 +85,15 @@ describe('AI aim & hysteresis', () => {
     expect(far.throttle).toBeGreaterThan(0); // close the distance
   });
 
-  it('seeks a nearby firing position beside cover', () => {
+  it('seeks a nearby firing position that preserves LOS and blocks hull shots', () => {
     const w = duel(70, 'slow');
     w.structures = [makeStructure(700, 'wall', 0, 50)];
     const brain = w.brains.get(1)!;
     thinkBrain(w, brain, w.tanks[1]);
     expect(brain.coverGoal).not.toBeNull();
     expect(brain.coverStructureId).toBe(700);
+    expect(hasLos(w, [brain.coverGoal!.x, 1.2, brain.coverGoal!.z], [0, 0.45, 0])).toBe(true);
+    expect(hasLos(w, [0, 1.2, 0], [brain.coverGoal!.x, 0.45, brain.coverGoal!.z])).toBe(false);
   });
 
   it('circles the target when no cover is nearby', () => {
@@ -127,6 +144,22 @@ describe('AI aim & hysteresis', () => {
     expect(brain.debug.evading).toBe(true);
   });
 
+  it('backs out of a stuck combat position without abandoning engage mode', () => {
+    const w = duel(70, 'slow');
+    const ai = w.tanks[1];
+    const brain = w.brains.get(1)!;
+    brain.mode = 'engage';
+    brain.targetId = 0;
+    brain.lastThrottle = 1;
+    brain.lastX = ai.x;
+    brain.lastZ = ai.z;
+    brain.stuckTicks = 180;
+    const cmd = thinkBrain(w, brain, ai);
+    expect(brain.avoidGoal).not.toBeNull();
+    expect(brain.mode).toBe('engage');
+    expect(cmd.throttle).toBeGreaterThan(0);
+  });
+
   it('fires while maneuvering, not only while stationary', () => {
     const w = duel(70, 'slow');
     const ai = w.tanks[1];
@@ -142,6 +175,7 @@ describe('AI aim & hysteresis', () => {
 
   it('prioritizes a recent attacker over ordinary contacts', () => {
     const w = duel(70, 'slow');
+    w.structures = [];
     const attacker = createEnemyTank(2, 'slow', 40, 40, 0);
     attacker.spawnTick = -1000;
     w.tanks.push(attacker);
@@ -181,18 +215,18 @@ describe('AI aim & hysteresis', () => {
     nearAttacker.spawnTick = -1000;
     farAttacker.spawnTick = -1000;
     w.tanks.push(nearAttacker, farAttacker);
-    w.structures = [makeStructure(700, 'wall', 10, 50)];
+    w.structures = [makeStructure(700, 'tower', -30, 80)];
     const brain = w.brains.get(1)!;
     brain.targetId = null;
     brain.lastTargetSwitchTick = -9999;
     w.awareness.get(1)!.set(2, { x: 40, z: 40, heading: 0, turretYaw: 0, tick: w.tick, source: 'ping' });
     w.awareness.get(1)!.set(3, { x: 50, z: 0, heading: 0, turretYaw: 0, tick: w.tick, source: 'ping' });
-    w.targeters.set(1, new Set([0, 2, 3]));
+    incoming(w, 1, [0, 2, 3]);
     const cmd = thinkBrain(w, brain, w.tanks[1]);
     expect(brain.targetId).toBe(2);
     expect(brain.debug.outnumbered).toBe(true);
     expect(brain.fleeGoal).not.toBeNull();
-    expect(cmd.throttle).toBeGreaterThan(0.5);
+    expect(cmd.throttle).toBeGreaterThan(0);
   });
 
   it('breaks away from the closest attacker when outnumbered with no cover', () => {
@@ -205,11 +239,97 @@ describe('AI aim & hysteresis', () => {
     brain.targetId = null;
     brain.lastTargetSwitchTick = -9999;
     w.awareness.get(1)!.set(2, { x: 40, z: 40, heading: 0, turretYaw: 0, tick: w.tick, source: 'ping' });
-    w.targeters.set(1, new Set([0, 2]));
+    incoming(w, 1, [0, 2]);
     const cmd = thinkBrain(w, brain, w.tanks[1]);
     expect(brain.targetId).toBe(2);
     expect(brain.fleeGoal).toBeNull();
     expect(cmd.throttle).toBeGreaterThan(0);
+  });
+
+  it('keeps a visible target instead of switching to a closer hidden attacker', () => {
+    const w = duel(70, 'slow');
+    w.structures = [makeStructure(701, 'tower', 20, 55)];
+    const hidden = createEnemyTank(2, 'slow', 40, 40, 0);
+    hidden.spawnTick = -1000;
+    w.tanks.push(hidden);
+    const brain = w.brains.get(1)!;
+    brain.targetId = 0;
+    brain.lastTargetSwitchTick = w.tick;
+    w.awareness.get(1)!.set(2, { x: 40, z: 40, heading: 0, turretYaw: 0, tick: w.tick, source: 'ping' });
+    w.threats.set(1, { tick: w.tick, from: 2 });
+    incoming(w, 1, [0, 2]);
+    thinkBrain(w, brain, w.tanks[1]);
+    expect(brain.targetId).toBe(0);
+    expect(brain.mode).toBe('engage');
+  });
+
+  it('uses target-switch hysteresis for similarly close visible attackers', () => {
+    const w = duel(70, 'slow');
+    w.structures = [];
+    const a = createEnemyTank(2, 'slow', 40, 40, 0);
+    const b = createEnemyTank(3, 'slow', 45, 35, 0);
+    a.spawnTick = -1000;
+    b.spawnTick = -1000;
+    w.tanks.push(a, b);
+    const brain = w.brains.get(1)!;
+    brain.targetId = 2;
+    brain.lastTargetSwitchTick = w.tick;
+    for (const t of [a, b]) {
+      w.awareness.get(1)!.set(t.id, { x: t.x, z: t.z, heading: 0, turretYaw: 0, tick: w.tick, source: 'los' });
+    }
+    incoming(w, 1, [2, 3]);
+    a.x = 80;
+    a.z = 80;
+    w.awareness.get(1)!.set(2, { x: 80, z: 80, heading: 0, turretYaw: 0, tick: w.tick, source: 'los' });
+    thinkBrain(w, brain, w.tanks[1]);
+    expect(brain.targetId).toBe(2);
+    w.tick += 60;
+    brain.nextThink = 0;
+    thinkBrain(w, brain, w.tanks[1]);
+    expect(brain.targetId).toBe(3);
+  });
+
+  it('flees under pressure even while investigating a hidden attacker', () => {
+    const w = duel(70, 'slow');
+    w.structures = [
+      makeStructure(701, 'tower', 20, 55),
+      makeStructure(702, 'tower', -20, 55),
+    ];
+    const a = createEnemyTank(2, 'slow', 40, 40, 0);
+    const b = createEnemyTank(3, 'slow', -40, 40, 0);
+    a.spawnTick = -1000;
+    b.spawnTick = -1000;
+    w.tanks.push(a, b);
+    for (const t of [a, b]) {
+      w.awareness.get(1)!.set(t.id, { x: t.x, z: t.z, heading: 0, turretYaw: 0, tick: w.tick, source: 'ping' });
+    }
+    incoming(w, 1, [2, 3]);
+    const cmd = thinkBrain(w, w.brains.get(1)!, w.tanks[1]);
+    expect(w.brains.get(1)!.mode).toBe('investigate');
+    expect(cmd.throttle).toBeGreaterThan(0);
+    expect(cmd.fire).toBe(false);
+  });
+
+  it('caches a failed flee search instead of scanning every tick', () => {
+    const w = duel(70, 'slow');
+    w.structures = [];
+    const a = createEnemyTank(2, 'slow', 40, 40, 0);
+    const b = createEnemyTank(3, 'slow', -40, 40, 0);
+    a.spawnTick = -1000;
+    b.spawnTick = -1000;
+    w.tanks.push(a, b);
+    for (const t of [a, b]) {
+      w.awareness.get(1)!.set(t.id, { x: t.x, z: t.z, heading: 0, turretYaw: 0, tick: w.tick, source: 'los' });
+    }
+    incoming(w, 1, [2, 3]);
+    const brain = w.brains.get(1)!;
+    thinkBrain(w, brain, w.tanks[1]);
+    const nextSearch = brain.nextFleeSeekTick;
+    expect(brain.fleeGoal).toBeNull();
+    w.tick++;
+    brain.nextThink = 0;
+    thinkBrain(w, brain, w.tanks[1]);
+    expect(brain.nextFleeSeekTick).toBe(nextSearch);
   });
 
   it('investigates ping information without firing until visual confirmation', () => {

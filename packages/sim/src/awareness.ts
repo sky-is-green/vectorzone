@@ -30,6 +30,24 @@ export function targetable(w: World, t: Tank): boolean {
   return t.alive && w.tick - t.spawnTick >= GRACE_TICKS;
 }
 
+/** Remember an observed shot near/hitting a target, per attacker. */
+export function recordIncomingFire(w: World, targetId: number, attackerId: number): void {
+  let attackers = w.incomingFire.get(targetId);
+  if (!attackers) {
+    attackers = new Map();
+    w.incomingFire.set(targetId, attackers);
+  }
+  attackers.set(attackerId, w.tick);
+}
+
+export function recentAttackers(w: World, targetId: number, ttl = GUNFIRE_TICKS): number[] {
+  const attackers = w.incomingFire.get(targetId);
+  if (!attackers) return [];
+  return [...attackers.entries()]
+    .filter(([, tick]) => w.tick - tick <= ttl)
+    .map(([id]) => id);
+}
+
 export function hasLos(w: World, from: V3, to: V3): boolean {
   const d: V3 = [to[0] - from[0], to[1] - from[1], to[2] - from[2]];
   const len = Math.hypot(d[0], d[1], d[2]);
@@ -101,6 +119,12 @@ function refresh(w: World, observer: Tank, t: Tank, source: ContactSource): void
 }
 
 export function stepAwareness(w: World): void {
+  for (const [targetId, attackers] of w.incomingFire) {
+    for (const [attackerId, tick] of attackers) {
+      if (w.tick - tick > GUNFIRE_TICKS) attackers.delete(attackerId);
+    }
+    if (!attackers.size) w.incomingFire.delete(targetId);
+  }
   const observers = w.tanks.filter((t) => t.alive);
   const fullScan = w.tick % 6 === 0; // 10 Hz LOS; proximity/gunfire remain per-tick
   for (const o of observers) {
@@ -140,7 +164,10 @@ export function stepAwareness(w: World): void {
           to[1] - ev.dir[1] * along,
           to[2] - ev.dir[2] * along,
         );
-        if (miss < 3.5) w.threats.set(o.id, { tick: w.tick, from: shooter.id });
+        if (miss < 3.5) {
+          w.threats.set(o.id, { tick: w.tick, from: shooter.id });
+          recordIncomingFire(w, o.id, shooter.id);
+        }
       }
     } else if (ev.kind === 'scanPing') {
       for (const o of observers) {

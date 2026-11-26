@@ -17,7 +17,7 @@ From the 1980 original:
 5. **Enemies come to you.** They spawn at 100–140 m — inside sight range, so
    they acquire you immediately — and approach; obstacles matter; the fight
    happens at medium range in open ground.
-6. **No retreat.** Enemies fight to the death (the original's only exception was the 100,000-point easter egg — kept as a stretch homage).
+6. **No passive retreat.** Enemies fight to the death; tactical cover-seeking and breaking contact under focused fire are allowed, but they do not disengage from the match.
 
 ## 2. What "toned down" means (the fairness rules)
 
@@ -58,8 +58,8 @@ Everything above lives in the shared sim, seeded → identical on host and clien
 - **Hull-first aim**: default aim point is the lower hull (~0.45–0.57 m) with
   downward gun pitch. Deliberate turret shots are rare (10% light / 15% super,
   halved against the player).
-- **Error cone**: each shot deviates within a cone (±2–6° by type). The cone **widens** with target angular velocity and range, so strafing and distance are real defenses.
-- **Ranging shots**: the first shot at a fresh contact carries extra bias; follow-ups walk toward the target (bracketing), tightening slightly on hits — capped, never perfect. It *looks* like a human finding the range.
+- **Error cone**: each shot deviates within a cone (±2–6° by type). The cone **widens** with range and the target's lateral speed, so movement and distance are real defenses.
+- **Ranging shots**: the first shot at a fresh contact carries extra bias; follow-ups use the normal cone. Aim leads visible movement by one imperfect shell-flight estimate, assuming the target holds its current heading; turning still beats the prediction.
 - **Fire discipline**: shoot only when LOS clear + alignment within tolerance + inside range + cooldown elapsed. Cooldowns 1.4–3.5 s by type.
 - **Blocked shot policy**: information without visual confirmation always means investigate, never fire. Supertanks are faster and more accurate, but they do not shoot through unseen cover.
 
@@ -70,10 +70,8 @@ Everything above lives in the shared sim, seeded → identical on host and clien
 ### 5.1 Slow tank — the honest duel
 
 - **State machine**: `PATROL` (no contacts → waypoint movement + slow turret scan) → `INVESTIGATE` (ping/gunfire/proximity without LOS → drive to last-known position, never fire) → `ENGAGE` (visual confirmation → seek cover, or circle if none; advance/retreat to maintain range; fire while moving) → repeat when target dies/contact expires. `REPOSITION` is stuck recovery only.
-- **Retaliation**: a tank hit by an attacker prioritizes that attacker for ~6 s, then returns to normal target selection.
-- **Outnumbered**: when 2+ enemies target it, the AI locks onto the closest
-  attacker, keeps firing while fleeing to cover, and stops switching targets.
-  No cover → break away from the closest attacker.
+- **Retaliation**: a visible recent attacker outranks ordinary contacts for ~6 s. A hidden attacker never pulls the AI away from a visible threat; it is investigated when no visible target exists.
+- **Outnumbered**: 2+ **observed incoming shots** within 3 s trigger pressure. The AI locks onto the closest visible attacker with range hysteresis, keeps firing when alignment/LOS allow, and flees independently of target visibility. Cover must block a hull shot while preserving the AI's firing line; otherwise it breaks away from the weighted attacker positions.
 - Direct, predictable, forgiving. The tutorial opponent that never stops being useful.
 
 ### 5.2 Missile — the airborne committed threat
@@ -159,7 +157,8 @@ Every knob is per-map/per-mode tunable data — the "tone it down" dial is a con
 ## 7. Architecture
 
 - **AI is just another command producer.** Each AI entity emits the same `TankCommand {throttle, turn, turretYaw, gunPitch, fire}` a player does, on its perception tick. The sim can't tell AI from human — which is exactly why it all runs host-authoritative with zero extra net code.
-- Steering is seek/orbit + whisker raycasts. **No pathfinding** — the arena is open ground, faithful to 1980, and repositioning handles the rest.
+- **Steering** is seek/orbit plus lightweight perimeter sampling for cover. There is no full pathfinding yet; local obstacle navigation remains a known limitation. Combat stuck detection triggers a short escape move without dropping engage mode.
+- **Pressure memory** records only shots that hit or pass near a tank, per attacker. AI never reads another brain's target choice, preserving the shared imperfect-information rule.
 - **Debug overlay** (toggle): intent lines, LOS rays, aim cones, memory ghosts. Invaluable for tuning, and a great learning window into how the AI thinks.
 
 ## 8. Milestone integration

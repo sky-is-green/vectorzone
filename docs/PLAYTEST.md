@@ -38,6 +38,9 @@ tuning. A milestone with an un-run play-test is not fully done (BUILD.md §3).
 
 ### AI & radar feel (from M5)
 - [ ] AI feels like a fallible opponent, never an aimbot; misses look believable.
+- [ ] Under fire from two visible enemies, AI keeps one target, flees purposefully, and still shoots when aligned.
+- [ ] Cover use looks intentional: AI moves to protected hull positions, not merely next to arbitrary objects.
+- [ ] Moving targets are led imperfectly; sharp turns still throw off AI aim.
 - [ ] Hazard telegraphs (rings, rumble) give enough warning in practice.
 - [ ] Radar readable at a glance; 30 m ring and blip decay understood without explanation.
 - [ ] Bomber pass: threat lane and information trap both legible.
@@ -62,6 +65,7 @@ tuning. A milestone with an un-run play-test is not fully done (BUILD.md §3).
 | F7 | 2026-11-26 | AI behavior | Hysteresis/target stickiness, hull-first aim, rare turret shots, and 10s turret-loss self-destruct need human feel confirmation | Watch AI at range boundaries, confirm hull hits dominate, destroy a turret and verify countdown/charge/blast | **open — awaiting human session** |
 | F9 | 2026-11-26 | AI loop | User reported wobble/stopping/no investigation; replaced with PATROL→INVESTIGATE→ENGAGE loop. Needs human confirmation | Watch no-info patrol, ping investigation behind cover, visual-only fire, target reset | **open — awaiting human session** |
 | F10 | 2026-11-26 | Damage feedback | AI retaliation targeting and player radar damage-bearing need human confirmation | Get hit from a known direction; verify rim arrow and AI turns on attacker | **open — awaiting human session** |
+| F11 | 2026-11-26 | AI decision model | Corrected private-target leakage, hidden-target switching, fake cover, unthrottled searches, and missing aim lead; automated checks pass but combat feel is unverified | Fight two AI at once; confirm stable closest-visible target, purposeful cover flee, no permanent fleeing, believable lead/misses | **open — awaiting human session** |
 | F8 | 2026-11-26 | Spectator | Death spectator cycling, killer-first selection, chase camera, countdown, and respawn reset need human feel confirmation | Die with multiple living tanks; cycle with arrows; confirm smooth camera and 3s reset | **open — awaiting human session** |
 
 ## Rule
