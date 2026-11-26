@@ -39,6 +39,7 @@ import { createPost } from './post';
 import { buildChunkGeometry, buildRubbleGeometry, buildScenery } from './scenery';
 import { buildPanel, loadSettings, saveSettings, type Settings } from './settings';
 import { pulseProgress } from './radar';
+import { livingSpectators, nextSpectatorId, spectatorLabel } from './spectator';
 import { explosionShake, impactShake } from './feedback';
 import './style.css';
 
@@ -76,6 +77,8 @@ const scanEdgeMat = makeLineMaterial(0x35e0ff, 1.8);
 const settings = loadSettings();
 const world = createWorld(0xb477e2, settings.map);
 let tank = world.tanks[0];
+let spectatedId: number | null = null;
+let lastKillerId: number | null = null;
 
 interface Body {
   group: THREE.Group;
@@ -338,6 +341,13 @@ applySettings(settings);
 let chase = false;
 window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyC') chase = !chase;
+  if (!tank.alive && (e.code === 'ArrowLeft' || e.code === 'ArrowRight')) {
+    spectatedId = nextSpectatorId(
+      livingSpectators(world.tanks, 0),
+      spectatedId,
+      e.code === 'ArrowRight' ? 1 : -1,
+    );
+  }
 });
 
 // scorch rings: 16 fading tangent dashes in the shared pool (client-only)
@@ -372,6 +382,9 @@ const debug: { cam: { p: [number, number, number]; l: [number, number, number] }
   },
   get rebuilds() {
     return rebuilds;
+  },
+  get spectatorId() {
+    return spectatedId;
   },
   post,
   scene,
@@ -453,6 +466,17 @@ function frame(now: number): void {
     accumulator = 0;
   }
   tank = world.tanks[0];
+  const spectators = tank.alive ? [] : livingSpectators(world.tanks, 0);
+  if (tank.alive) {
+    spectatedId = null;
+  } else if (spectators.length) {
+    if (spectatedId === null) {
+      spectatedId = spectators.find((t) => t.id === lastKillerId)?.id ?? spectators[0].id;
+    } else if (!spectators.some((t) => t.id === spectatedId)) {
+      spectatedId = spectators[0].id;
+    }
+  }
+  const spectatedTank = spectators.find((t) => t.id === spectatedId) ?? null;
   if (world.phase === 'over' && !matchReported) {
     matchReported = true;
     showGameOver();
@@ -771,6 +795,8 @@ function frame(now: number): void {
     // killfeed + directional hit flash
     if (ev.kind === 'tankKilled') {
       if (ev.id === 0) {
+        lastKillerId = ev.by;
+        spectatedId = null;
         killfeed.push({ text: ev.cause === 'selfDestruct' ? 'YOU SELF-DESTRUCTED' : ev.by === null ? 'THE ZONE KILLED YOU' : 'ENEMY KILLED YOU', born: now });
       } else if (ev.cause === 'selfDestruct') {
         killfeed.push({ text: 'ENEMY SELF-DESTRUCTED', born: now });
@@ -849,8 +875,16 @@ function frame(now: number): void {
   if (debug.cam) {
     camera.position.set(...debug.cam.p);
     camera.lookAt(...debug.cam.l);
-  } else if (!tank.alive && world.respawnTick > 0) {
-    // deathcam: hold on the wreck for the 3 s respawn delay
+  } else if (!tank.alive && spectatedTank) {
+    // spectator chase cam: watch the selected living tank
+    camera.position.set(
+      spectatedTank.x - Math.sin(spectatedTank.heading) * 12,
+      6.5,
+      spectatedTank.z - Math.cos(spectatedTank.heading) * 12,
+    );
+    camera.lookAt(spectatedTank.x, 1.2, spectatedTank.z);
+  } else if (!tank.alive) {
+    // no living targets: hold on the wreck
     camera.position.set(tank.x + 6, 4, tank.z + 6);
     camera.lookAt(tank.x, 1, tank.z);
   } else if (chase) {
@@ -948,6 +982,10 @@ function frame(now: number): void {
     hitFlash,
     elevation: tank.gunPitch,
     selfDestructSeconds: tank.selfDestructTick === null ? null : Math.max(0, (tank.selfDestructTick - world.tick) / 60),
+    spectator: spectatedTank ? {
+      label: spectatorLabel(spectatedTank, world.brains.get(spectatedTank.id)?.kind),
+      secondsLeft: Math.max(0, (world.respawnTick - world.tick) / 60),
+    } : null,
     now,
   });
 

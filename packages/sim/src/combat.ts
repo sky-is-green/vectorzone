@@ -52,6 +52,7 @@ export const LAVA_DAMAGE = 2;
 export const SELF_DESTRUCT_TICKS = 600; // 10 s
 export const SELF_DESTRUCT_RADIUS = 4.5;
 export const SELF_DESTRUCT_DAMAGE = 6;
+export const RESPAWN_TICKS = 180; // 3 s deathcam / spectator window
 
 export type SimEvent =
   | { kind: 'fire'; pos: V3; dir: V3; owner: number }

@@ -220,7 +220,7 @@ Known limit: a few symmetric-NAT setups can't punch through WebRTC; the self-hos
 - **Synthesized audio**: engine hum pitched to speed, tread squeak, shell crack, block crunch, kill boom, bomber warble. All oscillators/noise — zero files.
 - **Gamepad** support (left stick drives, right stick aims), plus the keyboard scheme above.
 - Escalating AI (slow tanks → missiles → supertanks), the bomber flyby, score/lives loop for solo play.
-- Stretch shelf (explicitly *not* v1): authentic dual-stick arcade mode, clip export, spectator mode, WebXR periscope. Retention features (dailies, ghosts, replays, leaderboards) are cut by positioning — this is a try-once tech demo.
+- Stretch shelf (explicitly *not* v1): authentic dual-stick arcade mode, clip export, WebXR periscope. Retention features (dailies, ghosts, replays, leaderboards) are cut by positioning — this is a try-once tech demo.
 
 ---
 

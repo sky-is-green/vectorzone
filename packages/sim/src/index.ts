@@ -68,6 +68,7 @@ export {
   SELF_DESTRUCT_TICKS,
   SELF_DESTRUCT_RADIUS,
   SELF_DESTRUCT_DAMAGE,
+  RESPAWN_TICKS,
   PEN_COST,
   type Shell,
   type SimEvent,

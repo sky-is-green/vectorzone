@@ -42,6 +42,7 @@ export interface HudState {
   hitFlash: { angle: number; born: number } | null;
   elevation: number;
   selfDestructSeconds: number | null;
+  spectator: { label: string; secondsLeft: number } | null;
   now: number;
 }
 
@@ -253,6 +254,19 @@ export function createHud(): {
       ctx.beginPath();
       ctx.moveTo(rx - 6, ey); ctx.lineTo(rx + 6, ey);
       ctx.stroke();
+    }
+
+    // spectator label + respawn countdown
+    if (s.spectator) {
+      ctx.font = 'bold 13px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = hud;
+      ctx.fillText(
+        `SPECTATING ${s.spectator.label} · ←/→ CYCLE · RESPAWN ${Math.ceil(s.spectator.secondsLeft)}s`,
+        w / 2,
+        h / 2 + 54,
+      );
+      ctx.textAlign = 'left';
     }
 
     // self-destruct countdown: centered above the status readout

@@ -27,6 +27,7 @@ import {
   SELF_DESTRUCT_TICKS,
   SELF_DESTRUCT_RADIUS,
   SELF_DESTRUCT_DAMAGE,
+  RESPAWN_TICKS,
   type Shell,
   type SimEvent,
   type Blast,
@@ -354,7 +355,7 @@ function stepIntegrity(w: World, damaged: Damaged): void {
         if (ctx.tank.id === 0) {
           w.lives--;
           if (w.lives <= 0) w.phase = 'over';
-          else w.respawnTick = w.tick + 180;
+          else w.respawnTick = w.tick + RESPAWN_TICKS;
         } else if (by === 0) {
           const brain = w.brains.get(ctx.tank.id);
           w.score += brain?.kind === 'super' ? SCORE_VALUES.super : SCORE_VALUES.slow;
@@ -397,7 +398,7 @@ function stepSelfDestruct(w: World, damaged: Damaged): void {
     if (t.id === 0) {
       w.lives--;
       if (w.lives <= 0) w.phase = 'over';
-      else w.respawnTick = w.tick + 180;
+      else w.respawnTick = w.tick + RESPAWN_TICKS;
     }
   }
 }
