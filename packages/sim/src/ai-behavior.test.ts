@@ -60,7 +60,7 @@ describe('AI aim & hysteresis', () => {
     brain.mode = 'engage';
     const near = thinkBrain(w, brain, w.tanks[1]);
     expect(brain.mode).toBe('engage');
-    expect(near.throttle).toBeGreaterThan(0); // mid-range strafe, never sit still
+    expect(near.throttle).toBeGreaterThan(0); // cover-seeking or orbiting, never sitting still
 
     w.tanks[1].z = 101; // well beyond high+10
     w.awareness.get(1)!.set(0, { x: 0, z: 0, heading: 0, turretYaw: 0, tick: w.tick, source: 'los' });
@@ -68,6 +68,39 @@ describe('AI aim & hysteresis', () => {
     const far = thinkBrain(w, brain, w.tanks[1]);
     expect(brain.mode).toBe('engage');
     expect(far.throttle).toBeGreaterThan(0); // close the distance
+  });
+
+  it('seeks a nearby firing position beside cover', () => {
+    const w = duel(70, 'slow');
+    w.structures = [makeStructure(700, 'wall', 0, 50)];
+    const brain = w.brains.get(1)!;
+    thinkBrain(w, brain, w.tanks[1]);
+    expect(brain.coverGoal).not.toBeNull();
+    expect(brain.coverStructureId).toBe(700);
+  });
+
+  it('circles the target when no cover is nearby', () => {
+    const w = duel(70, 'slow');
+    w.structures = [];
+    const brain = w.brains.get(1)!;
+    thinkBrain(w, brain, w.tanks[1]);
+    expect(brain.coverGoal).toBeNull();
+    expect(brain.orbitAngle).not.toBeNull();
+    const firstAngle = brain.orbitAngle!;
+    brain.nextThink = 0;
+    brain.nextOrbitTick = 0;
+    thinkBrain(w, brain, w.tanks[1]);
+    expect(brain.orbitAngle).not.toBe(firstAngle);
+  });
+
+  it('prioritizes cover when under fire', () => {
+    const w = duel(70, 'slow');
+    w.structures = [makeStructure(700, 'wall', 0, 50)];
+    w.threats.set(1, { tick: w.tick, from: 0 });
+    const brain = w.brains.get(1)!;
+    thinkBrain(w, brain, w.tanks[1]);
+    expect(brain.debug.evading).toBe(true);
+    expect(brain.coverGoal).not.toBeNull();
   });
 
   it('advances, retreats, and evades incoming fire instead of sitting still', () => {

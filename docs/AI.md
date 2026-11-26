@@ -69,7 +69,7 @@ Everything above lives in the shared sim, seeded → identical on host and clien
 
 ### 5.1 Slow tank — the honest duel
 
-- **State machine**: `PATROL` (no contacts → waypoint movement + slow turret scan) → `INVESTIGATE` (ping/gunfire/proximity without LOS → drive to last-known position, never fire) → `ENGAGE` (visual confirmation → advance/retreat/strafe/evade while aiming and firing) → repeat when target dies/contact expires. `REPOSITION` is stuck recovery only.
+- **State machine**: `PATROL` (no contacts → waypoint movement + slow turret scan) → `INVESTIGATE` (ping/gunfire/proximity without LOS → drive to last-known position, never fire) → `ENGAGE` (visual confirmation → seek cover, or circle if none; advance/retreat to maintain range; fire while moving) → repeat when target dies/contact expires. `REPOSITION` is stuck recovery only.
 - **Retaliation**: a tank hit by an attacker prioritizes that attacker for ~6 s, then returns to normal target selection.
 - Direct, predictable, forgiving. The tutorial opponent that never stops being useful.
 

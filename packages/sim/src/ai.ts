@@ -46,8 +46,12 @@ export interface AiBrain {
   investigateGoal: { x: number; z: number } | null;
   searchCenter: { x: number; z: number } | null;
   searchUntilTick: number;
-  maneuverDirection: 1 | -1;
-  nextManeuverTick: number;
+  coverGoal: { x: number; z: number } | null;
+  coverStructureId: number | null;
+  nextCoverSeekTick: number;
+  orbitAngle: number | null;
+  orbitDirection: 1 | -1;
+  nextOrbitTick: number;
   reposition: { x: number; z: number } | null;
   nextThink: number;
   lastTargetSwitchTick: number;
@@ -71,8 +75,12 @@ export function createBrain(kind: AiKind, playerTracker = false): AiBrain {
     investigateGoal: null,
     searchCenter: null,
     searchUntilTick: 0,
-    maneuverDirection: 1,
-    nextManeuverTick: 0,
+    coverGoal: null,
+    coverStructureId: null,
+    nextCoverSeekTick: 0,
+    orbitAngle: null,
+    orbitDirection: 1,
+    nextOrbitTick: 0,
     reposition: null,
     nextThink: 0,
     lastTargetSwitchTick: -9999,
@@ -138,6 +146,49 @@ function newInvestigateGoal(w: World, center: { x: number; z: number }): { x: nu
   return { x: clamp(center.x + Math.sin(a) * r, -190, 190), z: clamp(center.z + Math.cos(a) * r, -190, 190) };
 }
 
+interface CoverGoal {
+  x: number;
+  z: number;
+  structureId: number;
+}
+
+/**
+ * Find a firing position beside nearby cover. The candidate must have LOS to
+ * the target (so it can shoot from there), stay in the preferred range band,
+ * and be close to the AI. Searches are throttled/cached by the caller.
+ */
+function findCoverGoal(
+  w: World,
+  t: Tank,
+  target: Tank,
+  range: [number, number],
+): CoverGoal | null {
+  const mid = (range[0] + range[1]) / 2;
+  let best: CoverGoal | null = null;
+  let bestScore = Infinity;
+  for (const s of w.structures) {
+    if (!s.grid.cells.some((c) => c)) continue;
+    if (dist2(t, s) > 55) continue;
+    const hx = (s.grid.size.x * BLOCK_SIZE) / 2 + 2.5;
+    const hz = (s.grid.size.z * BLOCK_SIZE) / 2 + 2.5;
+    for (const sx of [-1, 1]) {
+      for (const sz of [-1, 1]) {
+        const candidate = { x: clamp(s.x + sx * hx, -190, 190), z: clamp(s.z + sz * hz, -190, 190) };
+        const fromAi = dist2(t, candidate);
+        const fromTarget = dist2(target, candidate);
+        if (fromAi > 45 || fromTarget < range[0] - 15 || fromTarget > range[1] + 15) continue;
+        if (!hasLos(w, [candidate.x, 1.2, candidate.z], [target.x, 1.2, target.z])) continue;
+        const score = fromAi + Math.abs(fromTarget - mid) * 0.7;
+        if (score < bestScore) {
+          bestScore = score;
+          best = { x: candidate.x, z: candidate.z, structureId: s.id };
+        }
+      }
+    }
+  }
+  return best;
+}
+
 function chooseAimY(w: World, brain: AiBrain, targetId: number): void {
   const K = AI_KNOBS[brain.kind];
   const chance = K.turretShotChance * (targetId === 0 ? 0.5 : 1);
@@ -186,6 +237,9 @@ export function thinkBrain(w: World, brain: AiBrain, t: Tank): TankCommand {
     brain.investigateGoal = null;
     brain.searchCenter = null;
     brain.searchUntilTick = 0;
+    brain.coverGoal = null;
+    brain.coverStructureId = null;
+    brain.orbitAngle = null;
     brain.shotsAtContact = 0;
   }
 
@@ -197,6 +251,9 @@ export function thinkBrain(w: World, brain: AiBrain, t: Tank): TankCommand {
     brain.investigateGoal = null;
     brain.searchCenter = null;
     brain.searchUntilTick = 0;
+    brain.coverGoal = null;
+    brain.coverStructureId = null;
+    brain.orbitAngle = null;
     if (!brain.patrolGoal || dist2(t, brain.patrolGoal) < 8) brain.patrolGoal = newPatrolGoal(w, t);
     brain.debug.intent = [brain.patrolGoal.x, 0.8, brain.patrolGoal.z];
     brain.debug.los = false;
@@ -204,7 +261,12 @@ export function thinkBrain(w: World, brain: AiBrain, t: Tank): TankCommand {
   }
 
   const switched = brain.targetId !== found.id;
-  if (switched) brain.shotsAtContact = 0;
+  if (switched) {
+    brain.shotsAtContact = 0;
+    brain.coverGoal = null;
+    brain.coverStructureId = null;
+    brain.orbitAngle = null;
+  }
   brain.targetId = found.id;
   const target = w.tanks.find((x) => x.id === found.id)!;
   const contact = found.k;
@@ -229,6 +291,9 @@ export function thinkBrain(w: World, brain: AiBrain, t: Tank): TankCommand {
 
   // Information without visual confirmation: investigate the last-known
   // position. Never fire from ping/gunfire/memory alone.
+  brain.coverGoal = null;
+  brain.coverStructureId = null;
+  brain.orbitAngle = null;
   if (brain.mode !== 'investigate' && brain.mode !== 'reposition') {
     brain.mode = 'investigate';
     brain.searchCenter = { x: contact.x, z: contact.z };
@@ -293,36 +358,49 @@ function execute(w: World, brain: AiBrain, t: Tank, cmd: TankCommand): TankComma
     const threat = w.threats.get(t.id);
     const underFire = threat !== undefined && w.tick - threat.tick < 90;
     brain.debug.evading = underFire;
-    if (underFire) {
-      // evade incoming fire: back away from the threat and add lateral motion
-      const away = Math.atan2(t.x - target.x, t.z - target.z);
-      const side = away + brain.maneuverDirection * 0.7;
-      goal = {
-        x: clamp(t.x + Math.sin(side) * 28, -190, 190),
-        z: clamp(t.z + Math.cos(side) * 28, -190, 190),
-      };
-      throttle = 0.8;
+
+    // Cover search is throttled; incoming fire makes it urgent.
+    const coverGone =
+      brain.coverStructureId !== null &&
+      !w.structures.some((s) => s.id === brain.coverStructureId && s.grid.cells.some((c) => c));
+    if (underFire || coverGone || w.tick >= brain.nextCoverSeekTick) {
+      const cover = findCoverGoal(w, t, target, K.range);
+      brain.coverGoal = cover ? { x: cover.x, z: cover.z } : null;
+      brain.coverStructureId = cover?.structureId ?? null;
+      brain.nextCoverSeekTick = w.tick + 90;
+    }
+
+    if (underFire && brain.coverGoal) {
+      goal = brain.coverGoal;
+      throttle = 0.7;
     } else if (d > K.range[1]) {
       // close distance to tighten the shot
+      brain.coverGoal = null;
       goal = target;
       throttle = 0.65;
     } else if (d < K.range[0]) {
       // too close: restore the band
+      brain.coverGoal = null;
       const away = Math.atan2(t.x - target.x, t.z - target.z);
       goal = { x: clamp(t.x + Math.sin(away) * 25, -190, 190), z: clamp(t.z + Math.cos(away) * 25, -190, 190) };
       throttle = 0.55;
+    } else if (brain.coverGoal) {
+      // fire from beside cover, with LOS already verified by the search
+      goal = brain.coverGoal;
+      throttle = 0.45;
     } else {
-      // mid-range combat strafe; reverse only on a slow timer, never per tick
-      if (w.tick >= brain.nextManeuverTick) {
-        brain.maneuverDirection = brain.maneuverDirection === 1 ? -1 : 1;
-        brain.nextManeuverTick = w.tick + 120 + Math.floor(w.rng.next() * 120);
+      // no cover nearby: smooth circle at the preferred range
+      if (brain.orbitAngle === null) brain.orbitAngle = angTo(target, t);
+      if (w.tick >= brain.nextOrbitTick) {
+        brain.orbitAngle += brain.orbitDirection * 0.16;
+        brain.nextOrbitTick = w.tick + 30;
       }
-      const side = angTo(target, t) + brain.maneuverDirection * (Math.PI / 2);
+      const radius = (K.range[0] + K.range[1]) / 2;
       goal = {
-        x: clamp(t.x + Math.sin(side) * 22, -190, 190),
-        z: clamp(t.z + Math.cos(side) * 22, -190, 190),
+        x: clamp(target.x + Math.sin(brain.orbitAngle) * radius, -190, 190),
+        z: clamp(target.z + Math.cos(brain.orbitAngle) * radius, -190, 190),
       };
-      throttle = 0.3;
+      throttle = underFire ? 0.5 : 0.35;
     }
   }
 
