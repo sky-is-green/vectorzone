@@ -40,7 +40,7 @@ Each AI tank keeps a small awareness state:
 
 - **Gunfire reveal**: any shot fired blips the shooter's position for ~3 s — to every player's radar and every AI's awareness. Silence is stealth; firing is an information cost.
 - **Proximity sense**: enemies within **30 m** are known continuously, even through cover — the same 30 m radius the player radar shows.
-- **Line of sight**: voxel DDA raycast (the same one shells use) from turret to target. Indestructible solids block sight; destructible cover blocks until it's gone.
+- **Line of sight**: voxel DDA raycast (the same one shells use) from turret to target. All structures block sight until destroyed or opened.
 - **Last-seen memory**: when LOS breaks, the AI remembers the target's last position + heading for ~5 s, decaying confidence. It drives to where you *were*, not where you are — classic flank counterplay.
 - **Scan-tower pings**: while a scan tower lives, its periodic ping refreshes every AI's knowledge of every tank (including players). Destroy it → AI falls back to gunfire + proximity + eyes.
 - **Ion storm**: spotting range and memory refresh degrade for its duration, for AI and players alike.
@@ -87,9 +87,9 @@ Everything above lives in the shared sim, seeded → identical on host and clien
 ### 5.3 Supertank — the aggressive veteran
 
 - Everything the slow tank does, faster: hull ~1.2× player, turret slew 120°/s, tighter cone, shorter cooldown.
-- **Flanks**: approach vectors offset from your heading; strafes while firing.
+- **Flanks**: approach vectors offset from your heading; seeks cover or circles while firing.
 - **Faster investigation and engagement**, but still no firing without visual confirmation.
-- More aggressive advance/strafe/evade timing; same human-like aim limits.
+- More aggressive advance/cover/orbit timing; same human-like aim limits.
 - Still bound by every fairness rule above — beatable by movement, cover play, and focus fire.
 
 ### 5.4 The bomber — the flying piñata (all modes)
