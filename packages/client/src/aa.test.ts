@@ -13,14 +13,14 @@ describe('ambient distant AA fire', () => {
   it('waits before the first volley', () => {
     const aa = new AmbientAa(rng(3));
     expect(aa.activeCount).toBe(0);
-    expect(aa.update(0.5, rng(3))).toEqual([]);
+    expect(aa.update(0.05, rng(3))).toEqual([]);
   });
 
-  it('spawns 2-4 distant tracers', () => {
+  it('spawns 2-3 distant tracers', () => {
     const aa = new AmbientAa(rng(5));
     aa.forceVolley(rng(5));
     expect(aa.activeCount).toBeGreaterThanOrEqual(2);
-    expect(aa.activeCount).toBeLessThanOrEqual(4);
+    expect(aa.activeCount).toBeLessThanOrEqual(3);
     const events = aa.update(1 / 60, rng(5));
     expect(events).toHaveLength(aa.activeCount);
     for (const e of events) {
@@ -55,7 +55,36 @@ describe('ambient distant AA fire', () => {
     const events = aa.update(20, rng(11));
     expect(events.some((e) => e.kind === 'explosion')).toBe(true);
     expect(aa.activeCount).toBeGreaterThanOrEqual(2);
-    expect(aa.activeCount).toBeLessThanOrEqual(4);
+    expect(aa.activeCount).toBeLessThanOrEqual(3);
+  });
+
+  it('biases new fire into the current view heading', () => {
+    const aa = new AmbientAa(rng(13));
+    const view = Math.PI / 2;
+    aa.forceVolley(rng(13), view);
+    for (const e of aa.update(1 / 60, rng(13), view)) {
+      if (e.kind !== 'tracer') continue;
+      const ahead = e.pos[0] * Math.sin(view) + e.pos[2] * Math.cos(view);
+      expect(ahead).toBeGreaterThan(0);
+    }
+  });
+
+  it('sustains activity across a long period', () => {
+    const random = rng(19);
+    const aa = new AmbientAa(random);
+    let tracers = 0;
+    let explosions = 0;
+    let maxActive = 0;
+    for (let i = 0; i < 60 * 60; i++) {
+      for (const e of aa.update(1 / 60, random, i * 0.002)) {
+        if (e.kind === 'tracer') tracers++;
+        else explosions++;
+      }
+      maxActive = Math.max(maxActive, aa.activeCount);
+    }
+    expect(tracers).toBeGreaterThan(1000);
+    expect(explosions).toBeGreaterThan(20);
+    expect(maxActive).toBeGreaterThanOrEqual(3);
   });
 
   it('is deterministic for the same seed', () => {

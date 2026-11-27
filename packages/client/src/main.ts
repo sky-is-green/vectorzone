@@ -552,40 +552,40 @@ function frame(now: number): void {
   scen.volcanoMat.color.setHex(
     vs === 'erupt' ? 0xff6b2b : vs === 'rumble' ? 0x8a4a20 : PALETTES[settings.palette % PALETTES.length].dim,
   );
-  for (const event of aa.update(dt)) {
+  for (const event of aa.update(dt, Math.random, radarViewHeading(tank.heading, tank.turretYaw))) {
     if (event.kind === 'tracer') {
       smoke.spawn(
         event.pos[0], event.pos[1], event.pos[2],
         event.dir[0] * 80, event.dir[1] * 80, event.dir[2] * 80,
-        0.08, tint.tracer[0], tint.tracer[1], tint.tracer[2], 2.4,
+        0.18, tint.tracer[0], tint.tracer[1], tint.tracer[2], 7,
       );
     } else {
       // Distant airburst: bright flash, ring, and radial sparks. All pooled.
       smoke.spawn(
         event.pos[0], event.pos[1], event.pos[2],
         0, 0, 0,
-        0.28, 1, 0.9, 0.55, 10,
+        0.45, 1, 0.9, 0.55, 20,
         1, 0, 0,
       );
-      for (let i = 0; i < 12; i++) {
-        const a = (i / 12) * Math.PI * 2;
+      for (let i = 0; i < 16; i++) {
+        const a = (i / 16) * Math.PI * 2;
         smoke.spawn(
-          event.pos[0] + Math.sin(a) * 3, event.pos[1], event.pos[2] + Math.cos(a) * 3,
+          event.pos[0] + Math.sin(a) * 7, event.pos[1], event.pos[2] + Math.cos(a) * 7,
           0, 0, 0,
-          0.65, tint.hazard[0], tint.hazard[1], tint.hazard[2], 1.8,
+          0.9, tint.hazard[0], tint.hazard[1], tint.hazard[2], 3,
           Math.cos(a), 0, -Math.sin(a),
         );
       }
-      for (let i = 0; i < 18; i++) {
+      for (let i = 0; i < 24; i++) {
         const a = Math.random() * Math.PI * 2;
         const y = (Math.random() - 0.5) * 2;
-        const speed = 8 + Math.random() * 10;
+        const speed = 12 + Math.random() * 10;
         smoke.spawn(
           event.pos[0], event.pos[1], event.pos[2],
           Math.sin(a) * speed, y * speed, Math.cos(a) * speed,
-          0.7 + Math.random() * 0.45,
+          1 + Math.random() * 0.6,
           tint.hazard[0], tint.hazard[1], tint.hazard[2],
-          1 + Math.random() * 1.1,
+          1.5 + Math.random() * 1.5,
         );
       }
     }

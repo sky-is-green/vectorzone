@@ -67,11 +67,14 @@ DORMANT ──► RUMBLE ──► ERUPT ──► COOLDOWN ──► DORMANT
 
 ### 3.4 Ambient distant AA fire
 
-- Purely visual client-side volleys of 2–4 tracers cross the far horizon every
-  5–11 s, with occasional distant airbursts.
-- Trajectories remain outside the playable arena and at sky altitude; they
-  never damage tanks, create radar contacts, or shake the camera.
-- Uses the existing particle pool only—no extra meshes, materials, or sim state.
+- Purely visual client-side volleys of 2–3 tracers cross the far horizon every
+  0.7–1.8 s, with frequent distant airbursts throughout the match.
+- New fire is biased into the player's current view; trajectories remain outside
+  the playable arena and at sky altitude.
+- Longer tracer streaks and larger flash/ring/spark bursts keep the action
+  readable from the normal ground camera.
+- They never damage tanks, create radar contacts, or shake the camera, and use
+  the existing particle pool only—no extra meshes, materials, or sim state.
 
 ---
 

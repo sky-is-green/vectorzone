@@ -15,7 +15,6 @@ interface AaShell {
   life: number;
 }
 
-const TAU = Math.PI * 2;
 const norm = (v: AaVec): AaVec => {
   const l = Math.hypot(v[0], v[1], v[2]) || 1;
   return [v[0] / l, v[1] / l, v[2] / l];
@@ -27,7 +26,7 @@ export class AmbientAa {
   private recent: AaEvent[] = [];
 
   constructor(rng: () => number = Math.random) {
-    this.nextVolley = 1.5 + rng() * 2.5;
+    this.nextVolley = 0.15 + rng() * 0.35;
   }
 
   get activeCount(): number {
@@ -39,11 +38,11 @@ export class AmbientAa {
   }
 
   /** Useful for deterministic tests and the browser debug hook. */
-  forceVolley(rng: () => number = Math.random): void {
-    this.spawnVolley(rng);
+  forceVolley(rng: () => number = Math.random, viewHeading = 0): void {
+    this.spawnVolley(rng, viewHeading);
   }
 
-  update(dt: number, rng: () => number = Math.random): AaEvent[] {
+  update(dt: number, rng: () => number = Math.random, viewHeading = 0): AaEvent[] {
     this.nextVolley -= dt;
     const events: AaEvent[] = [];
     const live: AaShell[] = [];
@@ -57,42 +56,42 @@ export class AmbientAa {
       else live.push(shell);
     }
     this.shells = live;
-    if (this.nextVolley <= 0) this.spawnVolley(rng);
+    if (this.nextVolley <= 0) this.spawnVolley(rng, viewHeading);
     this.recent = events;
     return events;
   }
 
-  private spawnVolley(rng: () => number): void {
-    const count = 2 + Math.floor(rng() * 3);
-    const bearing = rng() * TAU;
+  private spawnVolley(rng: () => number, viewHeading: number): void {
+    const count = 2 + Math.floor(rng() * 2);
+    // Bias new fire into the player's view so the distant battlefield reads
+    // without requiring a sky hunt.
+    const bearing = viewHeading + (rng() - 0.5) * 1.2;
     for (let i = 0; i < count; i++) {
-      const angle = bearing + (rng() - 0.5) * 0.35;
-      const radius = 280 + rng() * 80;
+      const angle = bearing + (rng() - 0.5) * 0.3;
+      const radius = 230 + rng() * 70;
       const pos: AaVec = [
         Math.sin(angle) * radius,
-        32 + rng() * 38,
+        42 + rng() * 38,
         Math.cos(angle) * radius,
       ];
-      // Tangential distant target: trajectories cross the far horizon rather
-      // than cutting through the playable arena.
-      const targetAngle = angle + (rng() - 0.5) * 1.1;
-      const targetRadius = 260 + rng() * 100;
+      const targetAngle = angle + (rng() - 0.5) * 0.9;
+      const targetRadius = 220 + rng() * 80;
       const target: AaVec = [
         Math.sin(targetAngle) * targetRadius,
-        38 + rng() * 42,
+        48 + rng() * 35,
         Math.cos(targetAngle) * targetRadius,
       ];
       const dir = norm([target[0] - pos[0], target[1] - pos[1], target[2] - pos[2]]);
-      const speed = 90 + rng() * 60;
+      const speed = 75 + rng() * 45;
       const distance = Math.hypot(target[0] - pos[0], target[1] - pos[1], target[2] - pos[2]);
       this.shells.push({
         pos,
         dir,
         speed,
         age: 0,
-        life: (distance / speed) * (0.5 + rng() * 0.25),
+        life: (distance / speed) * (0.65 + rng() * 0.25),
       });
     }
-    this.nextVolley = 5 + rng() * 6;
+    this.nextVolley = 0.7 + rng() * 1.1;
   }
 }
