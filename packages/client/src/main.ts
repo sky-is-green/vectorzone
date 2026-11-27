@@ -812,21 +812,19 @@ function frame(now: number): void {
   // lava pools: one persistent flashing-red hazard-ring mesh (rebuilt only
   // when pools change), plus sparse rising embers. The marker remains for the
   // full pool lifetime instead of disappearing with the incoming telegraph.
-  const key = world.lavaPools.map((p) => `${p.x.toFixed(1)},${p.z.toFixed(1)},${p.radius.toFixed(1)},${p.untilTick}`).join('|');
+  const key = world.lavaPools.map((p) => `${p.x.toFixed(1)},${p.z.toFixed(1)},${p.markerRadius.toFixed(1)},${p.untilTick}`).join('|');
   if (key !== lavaKey) {
     lavaKey = key;
     const pos: number[] = [];
     for (const pool of world.lavaPools) {
-      for (let ring = 0; ring < 2; ring++) {
-        const r = pool.radius * (ring === 0 ? 1 : 0.55);
-        for (let i = 0; i < 32; i++) {
-          const a = (i / 32) * Math.PI * 2;
-          const b = ((i + 1) / 32) * Math.PI * 2;
-          pos.push(
-            pool.x + Math.sin(a) * r, 0.07, pool.z + Math.cos(a) * r,
-            pool.x + Math.sin(b) * r, 0.07, pool.z + Math.cos(b) * r,
-          );
-        }
+      const r = pool.markerRadius;
+      for (let i = 0; i < 32; i++) {
+        const a = (i / 32) * Math.PI * 2;
+        const b = ((i + 1) / 32) * Math.PI * 2;
+        pos.push(
+          pool.x + Math.sin(a) * r, 0.07, pool.z + Math.cos(a) * r,
+          pool.x + Math.sin(b) * r, 0.07, pool.z + Math.cos(b) * r,
+        );
       }
     }
     updateFatLinesFromArray(lavaLines, pos.length ? pos : new Float32Array(6));

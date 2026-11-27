@@ -19,6 +19,7 @@ export interface LavaPool {
   x: number;
   z: number;
   radius: number;
+  markerRadius: number;
   untilTick: number;
 }
 
@@ -75,7 +76,13 @@ export function stepVolcano(w: World): void {
 export function bombAftermath(w: World, x: number, z: number, kind: 'volcano' | 'meteor' = 'volcano'): void {
   if (kind === 'volcano') {
     // every volcanic bomb leaves a large, long-lived burning pool
-    w.lavaPools.push({ x, z, radius: LAVA_RADIUS + w.rng.next() * 2, untilTick: w.tick + LAVA_TICKS });
+    w.lavaPools.push({
+      x,
+      z,
+      radius: LAVA_RADIUS + w.rng.next() * 2,
+      markerRadius: VOLCANO_BLAST_RADIUS,
+      untilTick: w.tick + LAVA_TICKS,
+    });
     // some impacts also throw up fresh rock cover beside the pool
     if (w.rng.next() < 0.35) {
       const rx = Math.max(-190, Math.min(190, x + 8));

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createWorld, stepWorld } from './world';
-import { MATCH_TICKS, VOLCANO_FINAL_TICKS, LAVA_TICKS } from './combat';
+import { MATCH_TICKS, VOLCANO_FINAL_TICKS, LAVA_TICKS, VOLCANO_BLAST_RADIUS } from './combat';
 import { bombAftermath } from './volcano';
 import type { TankCommand } from './tank';
 
@@ -60,6 +60,7 @@ describe('match clock & volcano (user direction 2026-11-25)', () => {
     bombAftermath(w, 0, 0, 'volcano');
     expect(w.lavaPools).toHaveLength(1);
     expect(w.lavaPools[0].untilTick).toBe(w.tick + LAVA_TICKS);
+    expect(w.lavaPools[0].markerRadius).toBe(VOLCANO_BLAST_RADIUS);
     for (let i = 0; i < LAVA_TICKS - 1; i++) stepWorld(w, [N]);
     expect(w.lavaPools).toHaveLength(1);
     stepWorld(w, [N]);
