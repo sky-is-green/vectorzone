@@ -49,8 +49,8 @@ Defense shots use the exact tank-shell tracer path and color, with a shorter
 - Live-bundle probe before this depth fix: current asset had AA active in 61/80
   sampled frames with up to three shells, so the production code was running.
   The stats readout now includes `aa N` to make stale-tab diagnosis explicit.
-- Deployment probe: Pages build `2cf4c33` reached `built`; a cache-busted URL
-  served `index-TuTUpIeM.js` with `aa 2` in stats and zero console errors. The
-  plain URL can still serve the prior HTML until GitHub's 10-minute CDN cache
-  expires.
+- Deployment probe: Pages build `b34fea3` reached `built`; a cache-busted URL
+  served `index-UK-gL6TT.js` with `aa 3`, 55 draw calls, and zero console errors.
+  The plain URL can still serve the prior HTML until GitHub's 10-minute CDN
+  cache expires.
 - Full gate: 172 tests; 157.8 KB gzipped.
