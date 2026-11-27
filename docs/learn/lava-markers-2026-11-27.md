@@ -26,3 +26,6 @@ thin, and visually subtle, so the hazard marker appeared to disappear.
 - Live deployment `e02d255` built successfully; cache-busted URL served
   `index-DZMtSLhI.js` with one pool, zero telegraphs, and the red marker active.
   Zero console errors.
+- Exact-radius deployment `d48c34c` built successfully; cache-busted URL served
+  `index-p0EUXhqA.js` with marker radius 7 m and 32 rendered segments. Zero
+  console errors.
