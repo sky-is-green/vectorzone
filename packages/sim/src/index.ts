@@ -114,6 +114,7 @@ export {
   stepDirector,
   type Missile,
   type MissileTargetKind,
+  type DefenseShot,
   type Bomber,
   type Telegraph,
 } from './director';

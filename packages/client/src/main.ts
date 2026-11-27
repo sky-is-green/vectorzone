@@ -662,6 +662,16 @@ function frame(now: number): void {
       missileGroups.delete(id);
     }
   }
+  for (const shot of world.defenseShots) {
+    // Actual point-defense projectiles: no muzzle flare, just readable tracer
+    // rounds travelling through the world.
+    smoke.spawn(
+      shot.pos[0], shot.pos[1], shot.pos[2],
+      0, 0, 0,
+      0.07, 1, 0.82, 0.28, 2.2,
+      shot.dir[0], shot.dir[1], shot.dir[2],
+    );
+  }
   if (world.bomber) {
     if (!bomberGroup) {
       bomberGroup = makeFatLines(bomberGeometry(), effectEdgeMat);
@@ -882,16 +892,6 @@ function frame(now: number): void {
           ev.dir[1] * 12 + (Math.random() - 0.5) * 6,
           ev.dir[2] * 12 + (Math.random() - 0.5) * 6,
           0.15, tint.tracer[0], tint.tracer[1], tint.tracer[2], 0.6,
-        );
-      }
-    } else if (ev.kind === 'defenseFire') {
-      for (let i = 0; i < 5; i++) {
-        smoke.spawn(
-          ev.pos[0], ev.pos[1], ev.pos[2],
-          ev.dir[0] * 38 + (Math.random() - 0.5) * 3,
-          ev.dir[1] * 38 + (Math.random() - 0.5) * 3,
-          ev.dir[2] * 38 + (Math.random() - 0.5) * 3,
-          0.16, tint.hazard[0], tint.hazard[1], tint.hazard[2], 1.1,
         );
       }
     } else if (ev.kind === 'blockDestroyed') {

@@ -34,7 +34,7 @@ import {
 } from './combat';
 import { recordIncomingFire, stepAwareness, type Known } from './awareness';
 import { thinkBrain, AI_KNOBS, type AiBrain } from './ai';
-import { BOMBER_PERIOD, SCORE_VALUES, stepDirector, type Bomber, type Missile, type Telegraph } from './director';
+import { BOMBER_PERIOD, SCORE_VALUES, stepDirector, type Bomber, type DefenseShot, type Missile, type Telegraph } from './director';
 import { createVolcano, stepVolcano, type LavaPool, type Volcano } from './volcano';
 import { fenceAlive, fenceHitT, fencePush, type Fence } from './fence';
 import { MAPS, type MapId, type SkyProfile } from './maps';
@@ -79,6 +79,7 @@ export interface World {
   /** Observed incoming fire only: target -> attacker -> last near-miss/hit tick. */
   incomingFire: Map<number, Map<number, number>>;
   missiles: Missile[];
+  defenseShots: DefenseShot[];
   bomber: Bomber | null;
   telegraphs: Telegraph[];
   fences: Fence[];
@@ -127,6 +128,7 @@ export function createWorld(seed: number, map: MapId = 'classic'): World {
     threats: new Map(),
     incomingFire: new Map(),
     missiles: [],
+    defenseShots: [],
     bomber: null,
     telegraphs: [],
     fences: def.fences.map((f) => ({ ...f })),
@@ -611,6 +613,7 @@ export function hashWorld(w: World): string {
     `chk${w.chunks.length}`,
     `shl${w.shells.length}`,
     `mis${w.missiles.length}`,
+    `dfs${w.defenseShots.length}`,
     `bmb${w.bomber ? 1 : 0}`,
     `tel${w.telegraphs.length}`,
     `vol${w.volcano.state}`,
@@ -621,7 +624,10 @@ export function hashWorld(w: World): string {
     `spawn${w.nextSpawnTick}:${w.nextSuperTick}:${w.nextMissileTick}:${w.nextBomberVolleyTick}:${w.nextSuperVolleyTick}`,
   );
   for (const m of w.missiles) {
-    parts.push(`m${m.id}:${m.pos.map((n) => n.toFixed(3))}:${m.dir.map((n) => n.toFixed(3))}:${m.targetKind}:${m.targetId}:${m.mode}:${m.acquireRange}:${m.scale}:${m.tracking ? 1 : 0}:${m.age}:${m.maxAge}:${m.interceptTick ?? -1}:${m.interceptorId ?? -1}:${m.lastDefenseTick}`);
+    parts.push(`m${m.id}:${m.pos.map((n) => n.toFixed(3))}:${m.dir.map((n) => n.toFixed(3))}:${m.targetKind}:${m.targetId}:${m.mode}:${m.acquireRange}:${m.scale}:${m.tracking ? 1 : 0}:${m.age}:${m.maxAge}:${m.interceptTick ?? -1}:${m.interceptorId ?? -1}:${m.defenseShotsFired}:${m.nextDefenseShotTick}:${m.lastDefenseTick}`);
+  }
+  for (const shot of w.defenseShots) {
+    parts.push(`d${shot.id}:${shot.pos.map((n) => n.toFixed(3))}:${shot.dir.map((n) => n.toFixed(3))}:${shot.ownerId}:${shot.missileId}:${shot.canHit ? 1 : 0}:${shot.life.toFixed(3)}`);
   }
   if (w.bomber) parts.push(`b${w.bomber.id}:${w.bomber.pos.map((n) => n.toFixed(3))}:${w.bomber.targetId}`);
   const s = parts.join(';');

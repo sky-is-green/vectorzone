@@ -44,6 +44,8 @@ function missile(overrides: Partial<Missile> = {}): Missile {
     turnRate: 0.45,
     interceptTick: null,
     interceptorId: null,
+    defenseShotsFired: 0,
+    nextDefenseShotTick: 0,
     lastDefenseTick: -9999,
     ...overrides,
   };
@@ -310,6 +312,45 @@ describe('missile point defense', () => {
     }
     expect(intercepted).toBe(true);
     expect(w.missiles).toHaveLength(0);
+  });
+
+  it('fires three wide tracer corrections before the fourth ballistic intercept', () => {
+    const w = quietWorld();
+    w.tanks[0].alive = false;
+    w.bomber = bomber();
+    w.missiles.push(missile({
+      id: 901,
+      pos: [0, 15, 20],
+      targetKind: 'bomber',
+      targetId: 800,
+    }));
+    stepWorld(w, [N]);
+    const firstShot = w.defenseShots[0];
+    expect(firstShot).toBeTruthy();
+    expect(firstShot.canHit).toBe(false);
+    const start = [...firstShot.pos];
+    stepWorld(w, [N]);
+    const moved = w.defenseShots.find((s) => s.id === firstShot.id)!;
+    expect(Math.hypot(moved.pos[0] - start[0], moved.pos[1] - start[1], moved.pos[2] - start[2])).toBeGreaterThan(0);
+
+    const firing: { shotNumber: number; canHit: boolean }[] = [{ shotNumber: 1, canHit: false }];
+    let interceptTick = w.missiles[0].interceptTick;
+    let killedAt = -1;
+    for (let i = 0; i < 35 && w.missiles.length; i++) {
+      stepWorld(w, [N]);
+      for (const e of w.events) {
+        if (e.kind === 'defenseFire') firing.push({ shotNumber: e.shotNumber, canHit: e.canHit });
+        if (e.kind === 'kill' && e.id === 901) killedAt = w.tick;
+      }
+    }
+    expect(firing.slice(0, 4)).toEqual([
+      { shotNumber: 1, canHit: false },
+      { shotNumber: 2, canHit: false },
+      { shotNumber: 3, canHit: false },
+      { shotNumber: 4, canHit: true },
+    ]);
+    expect(killedAt).toBeGreaterThan(0);
+    expect(killedAt).toBeLessThan(interceptTick!);
   });
 
   it('bomber still guarantees an intercept against small fast missiles', () => {

@@ -31,7 +31,20 @@ export interface Missile {
   turnRate: number; // rad/s, deliberately low so tanks can escape
   interceptTick: number | null;
   interceptorId: number | null;
+  defenseShotsFired: number;
+  nextDefenseShotTick: number;
   lastDefenseTick: number;
+}
+
+export interface DefenseShot {
+  id: number;
+  ownerId: number;
+  missileId: number;
+  pos: V3;
+  dir: V3;
+  speed: number;
+  life: number;
+  canHit: boolean;
 }
 
 export interface Bomber {
@@ -60,6 +73,9 @@ export const LIGHT_TANK_COUNT = 4;
 export const MISSILE_MIN_TICKS = 1200;
 export const MISSILE_MAX_TICKS = 3000;
 export const MISSILE_BOUNDARY = 280;
+export const DEFENSE_SHOT_SPEED = 240;
+export const DEFENSE_SHOT_LIFE = 0.45;
+const SIM_DT = 1 / 60;
 const MISSILE_WEIGHTS = { player: 2, light: 1, super: 6, bomber: 5 } as const;
 
 const clamp = (v: number, lo: number, hi: number): number =>
@@ -222,6 +238,8 @@ export function spawnMissile(w: World, options: MissileSpawnOptions = {}): void 
     turnRate: tracking ? 0.45 : 0.25,
     interceptTick: null,
     interceptorId: null,
+    defenseShotsFired: 0,
+    nextDefenseShotTick: 0,
     lastDefenseTick: -9999,
   });
   if (target.kind === 'tank' && target.id === 0) w.events.push({ kind: 'missileLock', id, pos });
@@ -313,6 +331,7 @@ export function stepDirector(w: World): void {
     }
   }
   stepMissiles(w);
+  stepDefenseShots(w);
   stepBomber(w);
   stepTelegraphs(w);
 }
@@ -354,7 +373,9 @@ function acquireDefense(w: World, m: Missile): void {
       b.pos[0] - m.pos[0], b.pos[1] - m.pos[1], b.pos[2] - m.pos[2],
     ) < (m.scale < 1 ? 32 : 26)) {
       m.interceptorId = b.id;
-      m.interceptTick = w.tick + (m.scale < 1 ? 18 : 24);
+      m.interceptTick = w.tick + 48;
+      m.defenseShotsFired = 0;
+      m.nextDefenseShotTick = w.tick;
       m.lastDefenseTick = -9999;
     }
     return;
@@ -363,9 +384,55 @@ function acquireDefense(w: World, m: Missile): void {
   if (!target || w.brains.get(target.id)?.kind !== 'super') return;
   if (Math.hypot(target.x - m.pos[0], 1 - m.pos[1], target.z - m.pos[2]) < (m.scale < 1 ? 26 : 18)) {
     m.interceptorId = target.id;
-    m.interceptTick = w.tick + (m.scale < 1 ? 18 : 30);
+    m.interceptTick = w.tick + 48;
+    m.defenseShotsFired = 0;
+    m.nextDefenseShotTick = w.tick;
     m.lastDefenseTick = -9999;
   }
+}
+
+function fireDefenseShot(w: World, m: Missile, origin: V3): void {
+  const distance = Math.hypot(m.pos[0] - origin[0], m.pos[1] - origin[1], m.pos[2] - origin[2]);
+  const flight = distance / DEFENSE_SHOT_SPEED;
+  const lead: V3 = [
+    m.pos[0] + m.dir[0] * flight,
+    m.pos[1] + m.dir[1] * flight,
+    m.pos[2] + m.dir[2] * flight,
+  ];
+  const shotNumber = m.defenseShotsFired + 1;
+  const canHit = shotNumber >= 4;
+  if (!canHit) {
+    // Visible tracer correction: three deliberately wide rounds walk onto the
+    // target. They cannot damage or intercept anything.
+    const side = norm([m.dir[2], 0, -m.dir[0]]);
+    const miss = 4 - shotNumber;
+    lead[0] += side[0] * miss * 0.9;
+    lead[1] += miss * 0.35;
+    lead[2] += side[2] * miss * 0.9;
+  }
+  const dir = norm([lead[0] - origin[0], lead[1] - origin[1], lead[2] - origin[2]]);
+  w.defenseShots.push({
+    id: w.nextId++,
+    ownerId: m.interceptorId!,
+    missileId: m.id,
+    pos: [...origin],
+    dir,
+    speed: DEFENSE_SHOT_SPEED,
+    life: DEFENSE_SHOT_LIFE,
+    canHit,
+  });
+  w.events.push({
+    kind: 'defenseFire',
+    pos: origin,
+    dir,
+    owner: m.interceptorId!,
+    missileId: m.id,
+    shotNumber,
+    canHit,
+  });
+  m.defenseShotsFired = shotNumber;
+  m.nextDefenseShotTick = w.tick + 4;
+  m.lastDefenseTick = w.tick;
 }
 
 function stepDefense(w: World, m: Missile): void {
@@ -377,22 +444,37 @@ function stepDefense(w: World, m: Missile): void {
     m.interceptorId = null;
     return;
   }
+  if (m.defenseShotsFired < 4 && w.tick >= m.nextDefenseShotTick) {
+    fireDefenseShot(w, m, origin);
+    return;
+  }
   if (w.tick >= m.interceptTick) {
+    // Fallback only: the corrected fourth tracer normally intercepts first.
     m.alive = false;
     w.events.push({ kind: 'kill', id: m.id, what: 'missile', by: m.interceptorId });
     w.events.push({ kind: 'explosion', pos: [...m.pos], radius: 1.5, damage: 0, source: 'airburst' });
-    return;
   }
-  if (w.tick - m.lastDefenseTick < 3) return;
-  m.lastDefenseTick = w.tick;
-  const lead: V3 = [m.pos[0] + m.dir[0] * 1.5, m.pos[1] + m.dir[1] * 1.5, m.pos[2] + m.dir[2] * 1.5];
-  w.events.push({
-    kind: 'defenseFire',
-    pos: origin,
-    dir: norm([lead[0] - origin[0], lead[1] - origin[1], lead[2] - origin[2]]),
-    owner: m.interceptorId,
-    missileId: m.id,
-  });
+}
+
+function stepDefenseShots(w: World): void {
+  for (const shot of w.defenseShots) {
+    if (shot.life <= 0) continue;
+    shot.life -= SIM_DT;
+    const prev: V3 = [...shot.pos];
+    shot.pos[0] += shot.dir[0] * shot.speed * SIM_DT;
+    shot.pos[1] += shot.dir[1] * shot.speed * SIM_DT;
+    shot.pos[2] += shot.dir[2] * shot.speed * SIM_DT;
+    if (!shot.canHit) continue;
+    const target = w.missiles.find((m) => m.id === shot.missileId && m.alive);
+    if (target && segmentDistance(target.pos, prev, shot.pos) < 2.2) {
+      target.alive = false;
+      shot.life = 0;
+      w.events.push({ kind: 'kill', id: target.id, what: 'missile', by: shot.ownerId });
+      w.events.push({ kind: 'explosion', pos: [...target.pos], radius: 1.5, damage: 0, source: 'airburst' });
+    }
+  }
+  w.defenseShots = w.defenseShots.filter((s) => s.life > 0);
+  w.missiles = w.missiles.filter((m) => m.alive);
 }
 
 function stepMissiles(w: World): void {

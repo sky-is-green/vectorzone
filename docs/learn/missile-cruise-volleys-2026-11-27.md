@@ -56,9 +56,23 @@ Changes:
 - Natural-spawn regression tests now cover bomber and supertank schedules,
   prompt point defense, manual-bomber recovery, and independent timers.
 
-Reliability gate: 163 tests; full build 157.0 KB gzipped.
+Reliability gate: 164 tests; full build 157.3 KB gzipped.
 
 Browser natural-spawn probes (no forced timers): bomber volley delay 360 ticks,
 first defense 109 ticks after launch, four missiles, minimum stand-off 89.8 m;
 supertank volley delay 480 ticks, first defense 195 ticks after launch, four
 missiles. Zero console errors.
+
+## Visible tracer correction follow-up
+
+`defenseFire` was previously only a muzzle particle burst plus a timed kill.
+It is now a real simulated projectile stream:
+
+- Shots 1–3 are deliberately wide, with decreasing error, and cannot hit.
+- Shot 4 uses the corrected lead and performs the ballistic intercept.
+- A timer remains only as a last-resort guarantee.
+- Client rendering draws the moving tracer rounds and removes muzzle flare.
+
+Browser: two in-flight correction rounds rendered as distinct yellow tracer
+streaks with no muzzle burst. The regression test confirms shots 1–3 are
+non-lethal, shot 4 is live, and the intercept occurs before the timed fallback.
