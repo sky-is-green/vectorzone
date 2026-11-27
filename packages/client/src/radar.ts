@@ -35,6 +35,11 @@ export function radarPointer(yaw: number, length: number): { x: number; y: numbe
   return { x: Math.sin(yaw) * length, y: -Math.cos(yaw) * length };
 }
 
+/** Heading the player is actually looking along: hull plus relative turret. */
+export function radarViewHeading(hullHeading: number, turretYaw: number): number {
+  return hullHeading + turretYaw;
+}
+
 /** Camera-aligned radar yaw: 0 = up, positive = screen-right. World yaw is
  * positive-left because the camera looks along +Z, so the signs oppose. */
 export function radarDirectionYaw(worldYaw: number, ownHeading = 0): number {

@@ -38,7 +38,7 @@ import { ParticlePool } from './particles';
 import { createPost } from './post';
 import { buildChunkGeometry, buildRubbleGeometry, buildScenery } from './scenery';
 import { buildPanel, loadSettings, saveSettings, type Settings } from './settings';
-import { pulseProgress, radarBearing } from './radar';
+import { pulseProgress, radarBearing, radarViewHeading } from './radar';
 import { livingSpectators, nextSpectatorId, spectatorLabel } from './spectator';
 import { explosionShake, impactShake } from './feedback';
 import './style.css';
@@ -640,16 +640,17 @@ function frame(now: number): void {
       scene.add(g);
     }
     g.position.set(m.pos[0], m.pos[1], m.pos[2]);
+    g.scale.setScalar(m.scale);
     const dir = new THREE.Vector3(m.dir[0], m.dir[1], m.dir[2]).normalize();
     g.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
     // Fog-free exhaust trail: remains visible when the body aligns with the
     // horizon or is viewed end-on.
     for (let i = 0; i < 2; i++) {
-      const back = 2.2 + i * 0.8;
+      const back = (2.2 + i * 0.8) * m.scale;
       smoke.spawn(
         m.pos[0] - dir.x * back, m.pos[1] - dir.y * back, m.pos[2] - dir.z * back,
         -dir.x * 2 + (Math.random() - 0.5), (Math.random() - 0.5), -dir.z * 2 + (Math.random() - 0.5),
-        0.45 + i * 0.15, tint.hazard[0], tint.hazard[1], tint.hazard[2], 1.3,
+        0.45 + i * 0.15, tint.hazard[0], tint.hazard[1], tint.hazard[2], 1.3 * m.scale,
         dir.x, dir.y, dir.z,
       );
     }
@@ -863,15 +864,15 @@ function frame(now: number): void {
     if (ev.kind === 'blockDestroyed' && ev.by !== 0 && Math.hypot(ev.pos[0] - tank.x, ev.pos[2] - tank.z) < 4) {
       const dx = ev.pos[0] - tank.x;
       const dz = ev.pos[2] - tank.z;
-      hitFlash = { angle: radarBearing(dx, dz, tank.heading), born: now };
-      playerThreat = { angle: radarBearing(dx, dz, tank.heading), born: now };
+      hitFlash = { angle: radarBearing(dx, dz, radarViewHeading(tank.heading, tank.turretYaw)), born: now };
+      playerThreat = { angle: radarBearing(dx, dz, radarViewHeading(tank.heading, tank.turretYaw)), born: now };
       shakeAmp = Math.min(0.5, shakeAmp + impactShake(Math.hypot(dx, dz)));
     }
     if (ev.kind === 'explosion' && Math.hypot(ev.pos[0] - tank.x, ev.pos[2] - tank.z) < 6) {
       const dx = ev.pos[0] - tank.x;
       const dz = ev.pos[2] - tank.z;
-      hitFlash = { angle: radarBearing(dx, dz, tank.heading), born: now };
-      playerThreat = { angle: radarBearing(dx, dz, tank.heading), born: now };
+      hitFlash = { angle: radarBearing(dx, dz, radarViewHeading(tank.heading, tank.turretYaw)), born: now };
+      playerThreat = { angle: radarBearing(dx, dz, radarViewHeading(tank.heading, tank.turretYaw)), born: now };
     }
     if (ev.kind === 'fire') {
       for (let i = 0; i < 8; i++) {
@@ -1025,6 +1026,8 @@ function frame(now: number): void {
       z: m.pos[2],
       heading: Math.atan2(m.dir[0], m.dir[2]),
       targeted: m.targetId === 0,
+      scale: m.scale,
+      mode: m.mode,
     })),
     scanner: scanner ? { x: scanner.x, z: scanner.z } : null,
     scanPulse: pulseProgress(now, lastScanPing),

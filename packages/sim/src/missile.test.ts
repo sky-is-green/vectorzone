@@ -18,6 +18,7 @@ function quietWorld(seed = 5) {
   w.nextSpawnTick = 1e9;
   w.nextSuperTick = 1e9;
   w.nextMissileTick = 1e9;
+  w.nextDefenseVolleyTick = 1e9;
   w.nextBomberTick = 1e9;
   w.nextStormTick = 1e9;
   w.nextMeteorTick = 1e9;
@@ -35,6 +36,9 @@ function missile(overrides: Partial<Missile> = {}): Missile {
     alive: true,
     targetKind: 'tank',
     targetId: 0,
+    mode: 'cruise',
+    acquireRange: 80,
+    scale: 1,
     tracking: true,
     turnRate: 0.45,
     interceptTick: null,
@@ -59,15 +63,30 @@ function bomber(overrides: Partial<Bomber> = {}): Bomber {
 }
 
 describe('missile targeting + lifetime', () => {
-  it('aims initial flight at the real 3-D target position', () => {
+  it('starts in horizontal cruise mode instead of diving immediately', () => {
     const w = quietWorld();
     spawnMissile(w);
     const m = w.missiles[0];
     const t = w.tanks[0];
-    const want = [t.x - m.pos[0], 1 - m.pos[1], t.z - m.pos[2]];
+    const want = [t.x - m.pos[0], t.z - m.pos[2]];
     const len = Math.hypot(...want);
-    const dot = m.dir[0] * want[0] / len + m.dir[1] * want[1] / len + m.dir[2] * want[2] / len;
+    const dot = m.dir[0] * want[0] / len + m.dir[2] * want[1] / len;
+    expect(m.mode).toBe('cruise');
+    expect(m.dir[1]).toBeCloseTo(0);
     expect(dot).toBeCloseTo(1);
+  });
+
+  it('stays high until acquisition, then enters attack mode and descends', () => {
+    const w = quietWorld();
+    w.missiles.push(missile({ pos: [0, 20, 120], speed: 16, tracking: false, turnRate: 0.25 }));
+    stepWorld(w, [N]);
+    expect(w.missiles[0].mode).toBe('cruise');
+    expect(w.missiles[0].pos[1]).toBeCloseTo(20);
+    expect(w.missiles[0].dir[1]).toBeCloseTo(0);
+    w.missiles[0].pos = [0, 20, 70];
+    stepWorld(w, [N]);
+    expect(w.missiles[0].mode).toBe('attack');
+    expect(w.missiles[0].dir[1]).toBeLessThan(0);
   });
 
   it('weights supertanks and the bomber above ordinary tanks', () => {
@@ -163,6 +182,41 @@ describe('missile targeting + lifetime', () => {
 });
 
 describe('missile point defense', () => {
+  it('launches 3-5 small fast missiles per bomber defense volley', () => {
+    const w = quietWorld();
+    w.tanks[0].alive = false;
+    w.bomber = bomber();
+    w.nextDefenseVolleyTick = 1;
+    stepWorld(w, [N]);
+    expect(w.missiles.length).toBeGreaterThanOrEqual(3);
+    expect(w.missiles.length).toBeLessThanOrEqual(5);
+    for (const m of w.missiles) {
+      expect(m.targetKind).toBe('bomber');
+      expect(m.targetId).toBe(800);
+      expect(m.scale).toBeLessThan(1);
+      expect(m.speed).toBeGreaterThanOrEqual(24);
+      expect(m.mode).toBe('cruise');
+    }
+  });
+
+  it('launches a similar smaller volley against the supertank', () => {
+    const w = quietWorld();
+    w.tanks[0].alive = false;
+    const superTank = createEnemyTank(1, 'super', 0, 0, 0);
+    superTank.spawnTick = -1000;
+    w.tanks.push(superTank);
+    w.brains.set(1, createBrain('super'));
+    w.nextDefenseVolleyTick = 1;
+    stepWorld(w, [N]);
+    expect(w.missiles.length).toBeGreaterThanOrEqual(3);
+    expect(w.missiles.length).toBeLessThanOrEqual(4);
+    for (const m of w.missiles) {
+      expect(m.targetId).toBe(1);
+      expect(m.scale).toBeLessThan(1);
+      expect(m.speed).toBeGreaterThanOrEqual(24);
+    }
+  });
+
   it('bomber emits bursts and guarantees an intercept', () => {
     const w = quietWorld();
     w.tanks[0].alive = false;
@@ -177,6 +231,27 @@ describe('missile point defense', () => {
     expect(w.events.some((e) => e.kind === 'defenseFire' && e.owner === 800)).toBe(true);
     let intercepted = false;
     for (let i = 0; i < 35 && w.missiles.length; i++) {
+      stepWorld(w, [N]);
+      intercepted ||= w.events.some((e) => e.kind === 'kill' && e.what === 'missile' && e.by === 800);
+    }
+    expect(intercepted).toBe(true);
+    expect(w.missiles).toHaveLength(0);
+  });
+
+  it('bomber still guarantees an intercept against small fast missiles', () => {
+    const w = quietWorld();
+    w.tanks[0].alive = false;
+    w.bomber = bomber();
+    w.missiles.push(missile({
+      id: 901,
+      pos: [0, 18, 28],
+      speed: 28,
+      scale: 0.62,
+      targetKind: 'bomber',
+      targetId: 800,
+    }));
+    let intercepted = false;
+    for (let i = 0; i < 25 && w.missiles.length; i++) {
       stepWorld(w, [N]);
       intercepted ||= w.events.some((e) => e.kind === 'kill' && e.what === 'missile' && e.by === 800);
     }

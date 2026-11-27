@@ -24,6 +24,9 @@ export interface Missile {
   alive: boolean;
   targetKind: MissileTargetKind;
   targetId: number | null;
+  mode: 'cruise' | 'attack';
+  acquireRange: number;
+  scale: number;
   tracking: boolean;
   turnRate: number; // rad/s, deliberately low so tanks can escape
   interceptTick: number | null;
@@ -110,7 +113,10 @@ function spawnTank(w: World, kind: AiKind): void {
   t.spawnTick = w.tick;
   w.tanks.push(t);
   w.brains.set(t.id, createBrain(kind));
-  if (kind === 'super') w.events.push({ kind: 'superSpawn', pos: [p.x, 1, p.z] });
+  if (kind === 'super') {
+    w.events.push({ kind: 'superSpawn', pos: [p.x, 1, p.z] });
+    w.nextDefenseVolleyTick = w.tick + 720;
+  }
 }
 
 /** Exactly one living AI is the player hunter; everyone else is FFA. */
@@ -160,19 +166,27 @@ function weightedMissileTarget(w: World, targets: MissileTarget[]): MissileTarge
   return targets[targets.length - 1];
 }
 
-export function spawnMissile(w: World): void {
+interface MissileSpawnOptions {
+  target?: MissileTarget;
+  small?: boolean;
+  speed?: [number, number];
+}
+
+export function spawnMissile(w: World, options: MissileSpawnOptions = {}): void {
   const targets = missileTargets(w);
-  if (!targets.length) return;
+  if (!targets.length && !options.target) return;
   const player = targets.find((t) => t.kind === 'tank' && t.id === 0);
   // Preserve frequent player pressure; the weighted pool raises bomber/super
   // odds without letting spectacle replace the main threat.
-  const target = player && w.rng.next() < 0.55
+  const target = options.target ?? (player && w.rng.next() < 0.55
     ? player
-    : weightedMissileTarget(w, targets);
+    : weightedMissileTarget(w, targets));
   const a = w.rng.next() * Math.PI * 2;
-  const pos: V3 = [Math.sin(a) * 205, 11 + w.rng.next() * 5, Math.cos(a) * 205];
-  const tracking = w.rng.next() < 0.6;
-  const speed = 14 + w.rng.next() * 4;
+  const altitude = options.small ? 20 + w.rng.next() * 4 : 18 + w.rng.next() * 6;
+  const pos: V3 = [Math.sin(a) * 205, altitude, Math.cos(a) * 205];
+  const tracking = options.small ? true : w.rng.next() < 0.6;
+  const speedRange = options.speed ?? [14, 18];
+  const speed = speedRange[0] + w.rng.next() * (speedRange[1] - speedRange[0]);
   const distance = Math.hypot(target.pos[0] - pos[0], target.pos[1] - pos[1], target.pos[2] - pos[2]);
   const maxAge = clamp(
     Math.ceil((distance / speed) * 60 * 1.6) + 240,
@@ -183,20 +197,45 @@ export function spawnMissile(w: World): void {
   w.missiles.push({
     id,
     pos,
-    dir: norm([target.pos[0] - pos[0], target.pos[1] - pos[1], target.pos[2] - pos[2]]),
+    // Cruise starts horizontal and high. Terminal guidance only begins after
+    // horizontal acquisition range is reached.
+    dir: norm([target.pos[0] - pos[0], 0, target.pos[2] - pos[2]]),
     speed,
     age: 0,
     maxAge,
     alive: true,
     targetKind: target.kind,
     targetId: target.id,
+    mode: 'cruise',
+    acquireRange: options.small ? 70 : 80,
+    scale: options.small ? 0.62 : 1,
     tracking,
-    turnRate: tracking ? 0.45 : 0, // rad/s: slow enough to dodge
+    turnRate: tracking ? 0.45 : 0.25,
     interceptTick: null,
     interceptorId: null,
     lastDefenseTick: -9999,
   });
   if (target.kind === 'tank' && target.id === 0) w.events.push({ kind: 'missileLock', id, pos });
+}
+
+function defenseVolleyTarget(w: World): MissileTarget | null {
+  const b = w.bomber;
+  if (b?.alive) return { kind: 'bomber', id: b.id, weight: 0, pos: [...b.pos] };
+  const superTank = w.tanks.find((t) => t.alive && w.brains.get(t.id)?.kind === 'super');
+  return superTank
+    ? { kind: 'tank', id: superTank.id, weight: 0, pos: [superTank.x, 1, superTank.z] }
+    : null;
+}
+
+function spawnDefenseVolley(w: World, target: MissileTarget): void {
+  const plane = target.kind === 'bomber';
+  const count = plane ? 3 + Math.floor(w.rng.next() * 3) : 3 + Math.floor(w.rng.next() * 2);
+  for (let i = 0; i < count; i++) {
+    spawnMissile(w, { target, small: true, speed: [24, 30] });
+  }
+  w.nextDefenseVolleyTick = w.tick + (plane
+    ? 540 + Math.floor(w.rng.next() * 300)
+    : 720 + Math.floor(w.rng.next() * 360));
 }
 
 export function stepDirector(w: World): void {
@@ -215,10 +254,12 @@ export function stepDirector(w: World): void {
       w.nextSuperTick = w.tick + 7200 + Math.floor(w.rng.next() * 3600); // 2-3 min
     }
     ensureTracker(w);
-    // airborne missile events, at most three active
-    if (w.tick >= w.nextMissileTick && w.missiles.filter((m) => m.alive).length < 3) {
+    // Normal player-pressure missiles keep their own three-active cap; small
+    // point-defense volleys do not consume those slots.
+    const normalMissiles = w.missiles.filter((m) => m.alive && m.scale >= 1).length;
+    if (w.tick >= w.nextMissileTick && normalMissiles < 3 && w.missiles.length < 12) {
       spawnMissile(w);
-      w.nextMissileTick = w.tick + 1500 + Math.floor(w.rng.next() * 1800); // 25-55 s
+      w.nextMissileTick = w.tick + 1500 + Math.floor(w.rng.next() * 1800); // 25–55 s
     }
     if (!w.bomber && w.tick >= w.nextBomberTick) {
       const target = w.tanks[0].alive
@@ -243,7 +284,13 @@ export function stepDirector(w: World): void {
         targetId: target.id,
       };
       w.nextBomberTick = w.tick + BOMBER_PERIOD;
+      w.nextDefenseVolleyTick = w.tick + 720;
       w.events.push({ kind: 'bomberInbound', pos: [sx, 15, sz] });
+    }
+    const defenseTarget = defenseVolleyTarget(w);
+    if (defenseTarget && w.tick >= w.nextDefenseVolleyTick) {
+      if (w.missiles.length < 10) spawnDefenseVolley(w, defenseTarget);
+      else w.nextDefenseVolleyTick = w.tick + 120;
     }
   }
   stepMissiles(w);
@@ -286,18 +333,18 @@ function acquireDefense(w: World, m: Missile): void {
     const b = w.bomber;
     if (b?.alive && b.id === m.targetId && Math.hypot(
       b.pos[0] - m.pos[0], b.pos[1] - m.pos[1], b.pos[2] - m.pos[2],
-    ) < 26) {
+    ) < (m.scale < 1 ? 32 : 26)) {
       m.interceptorId = b.id;
-      m.interceptTick = w.tick + 24;
+      m.interceptTick = w.tick + (m.scale < 1 ? 18 : 24);
       m.lastDefenseTick = -9999;
     }
     return;
   }
   const target = w.tanks.find((t) => t.id === m.targetId && t.alive);
   if (!target || w.brains.get(target.id)?.kind !== 'super') return;
-  if (Math.hypot(target.x - m.pos[0], 1 - m.pos[1], target.z - m.pos[2]) < 18) {
+  if (Math.hypot(target.x - m.pos[0], 1 - m.pos[1], target.z - m.pos[2]) < (m.scale < 1 ? 26 : 18)) {
     m.interceptorId = target.id;
-    m.interceptTick = w.tick + 30;
+    m.interceptTick = w.tick + (m.scale < 1 ? 18 : 30);
     m.lastDefenseTick = -9999;
   }
 }
@@ -336,9 +383,21 @@ function stepMissiles(w: World): void {
     stepDefense(w, m);
     if (!m.alive) continue;
     const targetPos = missileTargetPos(w, m);
-    if (m.tracking && targetPos) {
-      const want = norm([targetPos[0] - m.pos[0], targetPos[1] - m.pos[1], targetPos[2] - m.pos[2]]);
-      m.dir = turnDir(m.dir, want, m.turnRate / 60);
+    if (targetPos) {
+      const horizontal = Math.hypot(targetPos[0] - m.pos[0], targetPos[2] - m.pos[2]);
+      if (m.mode === 'cruise') {
+        if (horizontal <= m.acquireRange) {
+          m.mode = 'attack';
+        } else {
+          // Cruise stays high and only makes gentle horizontal corrections.
+          const cruise = norm([targetPos[0] - m.pos[0], 0, targetPos[2] - m.pos[2]]);
+          m.dir = turnDir(m.dir, cruise, (m.tracking ? 0.16 : 0.08) / 60);
+        }
+      }
+      if (m.mode === 'attack') {
+        const want = norm([targetPos[0] - m.pos[0], targetPos[1] - m.pos[1], targetPos[2] - m.pos[2]]);
+        m.dir = turnDir(m.dir, want, m.turnRate / 60);
+      }
     }
     const prev: V3 = [...m.pos];
     m.pos[0] += m.dir[0] * m.speed / 60;
@@ -346,7 +405,7 @@ function stepMissiles(w: World): void {
     m.pos[2] += m.dir[2] * m.speed / 60;
     // shot down? full 3-D proximity
     for (const sh of w.shells) {
-      if (Math.hypot(sh.pos[0] - m.pos[0], sh.pos[1] - m.pos[1], sh.pos[2] - m.pos[2]) < 1.8) {
+      if (Math.hypot(sh.pos[0] - m.pos[0], sh.pos[1] - m.pos[1], sh.pos[2] - m.pos[2]) < 1.8 * m.scale) {
         m.alive = false;
         sh.alive = false;
         w.events.push({ kind: 'kill', id: m.id, what: 'missile', by: sh.owner });
@@ -360,7 +419,7 @@ function stepMissiles(w: World): void {
     // is still above the old 3 m cutoff.
     let hitTank = false;
     for (const t of w.tanks) {
-      if (t.alive && segmentDistance([t.x, 1, t.z], prev, m.pos) < 2.4) {
+      if (t.alive && segmentDistance([t.x, 1, t.z], prev, m.pos) < 2.4 * m.scale) {
         hitTank = true;
         break;
       }
@@ -371,7 +430,7 @@ function stepMissiles(w: World): void {
       continue;
     }
     const b = w.bomber;
-    if (b?.alive && segmentDistance(b.pos, prev, m.pos) < 2.8) {
+    if (b?.alive && segmentDistance(b.pos, prev, m.pos) < 2.8 * m.scale) {
       m.alive = false;
       b.alive = false;
       w.events.push({ kind: 'kill', id: b.id, what: 'bomber', by: null });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { headingFromDir, projectRadar, pulseProgress, radarBearing, radarDirectionYaw, radarPointer, relativeHeading } from './radar';
+import { headingFromDir, projectRadar, pulseProgress, radarBearing, radarDirectionYaw, radarPointer, radarViewHeading, relativeHeading } from './radar';
 
 describe('radar projection + orientation', () => {
   it('forward contact points up', () => {
@@ -55,6 +55,16 @@ describe('radar projection + orientation', () => {
     expect(pulseProgress(1000, 1000)).toBe(0);
     expect(pulseProgress(1600, 1000)).toBeCloseTo(0.5);
     expect(pulseProgress(2200, 1000)).toBeNull();
+  });
+
+  it('view-aligned scope puts whatever the turret looks at ahead', () => {
+    const view = radarViewHeading(0, Math.PI / 2);
+    const scanner = projectRadar(60, 0, view, 200, 38);
+    const hullArrow = radarDirectionYaw(0, view);
+    expect(view).toBeCloseTo(Math.PI / 2);
+    expect(scanner.x).toBeCloseTo(0);
+    expect(scanner.y).toBeLessThan(0);
+    expect(hullArrow).toBeCloseTo(Math.PI / 2);
   });
 
   it('damage bearing is camera-aligned and relative to own hull heading', () => {

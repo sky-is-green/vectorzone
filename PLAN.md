@@ -143,7 +143,7 @@ Full design in **[`docs/RADAR.md`](docs/RADAR.md)**. Summary:
 - The radar reveals **anything that fires** (~3 s fading blip) and **any enemy within 30 m** (continuous). Nothing else — distant silent tanks are dark. Player-targeted missiles lock onto the radar; all missiles show as heading arrows; the scanner is a blue objective diamond; tank and aircraft icons use live headings.
 - Scan-tower pings remain the only full-field reveal; ion storms blind the scope.
 - AI awareness mirrors the same rules (symmetry) — no wallhacks, no omniscience.
-- Faithful presentation: circular heading-up scope in the red HUD band, rotating sweep, phosphor-decay blips, faint 30 m sense ring.
+- Faithful presentation: circular view-aligned scope in the red HUD band, rotating own-hull arrow, phosphor-decay blips, faint 30 m sense ring.
 
 ---
 

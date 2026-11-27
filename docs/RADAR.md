@@ -41,7 +41,7 @@ The original radar showed every enemy at all times. Ours turns information into 
 
 ## 4. The scope (presentation, faithful to the cabinet)
 
-- **Circular scope, heading-up**: player at center, radar rotates with hull heading; a small center arrow shows the hull, a thin tick shows turret aim. Positions and heading markers share one camera-aligned projection, so a marker's arrow always agrees with the side of the scope it occupies.
+- **Circular scope, view-aligned**: player at center, radar rotates with the actual camera/turret heading (`hull + turretYaw`). The own-hull arrow rotates relative to that view, so an object the player is looking at appears ahead. Positions and heading markers share one camera-aligned projection, so a marker's arrow always agrees with the side of the scope it occupies.
 - Drawn in the **red HUD band** across the top (the original's colored overlay), score and lives alongside, match clock left of the scope.
 - **Alert banner center-top, BELOW the band** (user direction 2026-11-25): `SUPERTANK INBOUND`, `BOMBER RUN`, `VOLCANO RUMBLING — ERUPTION IMMINENT`, `ERUPTION`, `MATCH COMPLETE` — palette-colored, ~4 s fade, max 3 stacked.
 - **Line-of-fire sight** (user direction 2026-11-25): a dim trajectory line from the muzzle to the predicted first impact (grid / obstacle / ground), with an impact cross — makes long-range and elevated shots readable before firing. Canvas 2D — light, crisp, no extra three.js scene needed.
@@ -52,9 +52,9 @@ The original radar showed every enemy at all times. Ours turns information into 
   supertank = brightest/larger red triangle; bomber = actual-position flight-heading
   triangle (only while its blip lives); missiles = orange arrows, player locks
   pulsing red; scanner = blue diamond; co-op allies = green.
-- **Turret-aligned pointer**: the long scope line and the short centre tick
-  both follow turret yaw (a cosmetic time-driven sweep was removed because it
-  appeared to move opposite the gun).
+- **View pointer**: the long scope line and short centre tick point straight
+  ahead in the current camera/turret direction; the own-hull arrow rotates to
+  show hull orientation relative to that view.
 - Blips flash bright then **decay like phosphor**; ion storm fills the scope with animated static.
 
 ## 5. Symmetry: AI knows exactly what you know
