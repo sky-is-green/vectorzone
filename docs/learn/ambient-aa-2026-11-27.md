@@ -24,7 +24,10 @@ small to confirm.
   short radial flash strokes, and 24 radial sparks. The circular ring and long
   horizontal flash bar were removed.
 - No sim entities, damage, radar reveals, camera shake, materials, or meshes are
-  added.
+  added by the AA system itself.
+- The mountain horizon now has a black occluding wall mesh beneath its glowing
+  ridge line, so AA ground launches are physically hidden until they clear the
+  silhouette.
 
 ## Point-defense rendering alignment
 
@@ -40,6 +43,9 @@ Defense shots use the exact tank-shell tracer path and color, with a shorter
   620 m ridge, moving upward. A tracked skyburst at roughly `[61, 80, 720]`
   rendered as a small star/spark cluster above the mountains with no circular
   ring or horizontal bar. Zero console errors.
+- Mountain fill probe: the normal camera now shows a solid black silhouette
+  beneath the glowing ridge; AA trails appear only above it. Draw calls remained
+  at 55 in the smoke scene.
 - Live-bundle probe before this depth fix: current asset had AA active in 61/80
   sampled frames with up to three shells, so the production code was running.
   The stats readout now includes `aa N` to make stale-tab diagnosis explicit.
@@ -47,4 +53,4 @@ Defense shots use the exact tank-shell tracer path and color, with a shorter
   served `index-TuTUpIeM.js` with `aa 2` in stats and zero console errors. The
   plain URL can still serve the prior HTML until GitHub's 10-minute CDN cache
   expires.
-- Full gate: 171 tests; 157.8 KB gzipped.
+- Full gate: 172 tests; 157.8 KB gzipped.

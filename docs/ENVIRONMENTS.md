@@ -23,7 +23,7 @@
 | **Arena** (matter) | ground grid, solids, structures, props, fences, rubble, scorch marks | Fully reactive — this is the gameplay layer |
 | **Ambient** (dust) | drifting line motes, impact sparks, ash, smoke wisps | Pure particles, pooled |
 
-The horizon sits far outside the play bounds and is rendered as cheap line strips with fog — it costs almost nothing but carries most of the atmosphere.
+The horizon sits far outside the play bounds. Mountain silhouettes use one black occluding wall mesh plus a glowing ridge line, so distant emitters truly sit behind the terrain; the rest is cheap line work with fog disabled where needed.
 
 ---
 
@@ -171,7 +171,8 @@ Arenas are JSON-ish layouts (object placements + block grids + event profile), s
 - Global line-particle pool: **1,024 segments**, shared by smoke, sparks, ash,
   embers, debris. Lava rings are one pooled thick-line mesh, not per-frame particles.
 - ≤ ~24 block structures per arena, each merged to **2 draw calls** (faces + edges); rubble merged arena-wide into 1–2 more.
-- Horizon: one line-strip mesh + one volcano emitter. Sky events reuse the particle pool.
+- Horizon: one black mountain-wall mesh, one glowing ridge line-strip, and one
+  volcano emitter. Sky events reuse the particle pool.
 - Scorch decals: pooled, ≤ 30. Idle animations: a handful of rotating/blinking objects + one shader time uniform.
 - Geometry rebuilds only on damage/collapse — never per frame.
 

@@ -46,6 +46,32 @@ export function buildScenery(scene: THREE.Scene): Scenery {
   const mountainMat = makeLineMaterial(DIM, 1.1, { fog: false });
   scene.add(makeFatLinesFromPositions(mseg, mountainMat));
 
+  // Solid inner-facing mountain wall. The black faces occlude anything behind
+  // the ridge (including ambient AA launch points); the glowing top line keeps
+  // the solid-vector silhouette readable.
+  const mountainFaces: number[] = [];
+  for (let i = 0; i < N; i++) {
+    const a = i * 3;
+    const b = ((i + 1) % N) * 3;
+    mountainFaces.push(
+      pts[a], -2, pts[a + 2],
+      pts[b], -2, pts[b + 2],
+      pts[b], pts[b + 1], pts[b + 2],
+      pts[a], -2, pts[a + 2],
+      pts[b], pts[b + 1], pts[b + 2],
+      pts[a], pts[a + 1], pts[a + 2],
+    );
+  }
+  const mountainFaceGeo = new THREE.BufferGeometry();
+  mountainFaceGeo.setAttribute('position', new THREE.Float32BufferAttribute(mountainFaces, 3));
+  const mountainFaceMat = new THREE.MeshBasicMaterial({
+    color: 0x000000,
+    side: THREE.DoubleSide,
+    fog: false,
+  });
+  const mountainWall = new THREE.Mesh(mountainFaceGeo, mountainFaceMat);
+  scene.add(mountainWall);
+
   // volcano: wireframe cone with a crater notch, on the horizon
   const a0 = 0.9;
   const vx = Math.sin(a0) * 620;
