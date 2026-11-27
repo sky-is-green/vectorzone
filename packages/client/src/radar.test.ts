@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { headingFromDir, projectRadar, pulseProgress, radarBearing, radarDisplayYaw, radarPointer, relativeHeading } from './radar';
+import { headingFromDir, projectRadar, pulseProgress, radarBearing, radarDirectionYaw, radarPointer, relativeHeading } from './radar';
 
 describe('radar projection + orientation', () => {
   it('forward contact points up', () => {
@@ -8,9 +8,9 @@ describe('radar projection + orientation', () => {
     expect(p.y).toBeLessThan(0);
   });
 
-  it('right contact points right', () => {
+  it('world +X is screen-left in the +Z camera convention', () => {
     const p = projectRadar(60, 0, 0);
-    expect(p.x).toBeGreaterThan(0);
+    expect(p.x).toBeLessThan(0);
     expect(p.y).toBeCloseTo(0);
   });
 
@@ -39,10 +39,16 @@ describe('radar projection + orientation', () => {
     expect(radarPointer(0, 10).y).toBeLessThan(0);
   });
 
-  it('world yaw is negated for the +Z camera minimap display', () => {
-    // screen-left world yaw is positive; displayed pointer must go left
-    expect(radarPointer(radarDisplayYaw(0.7), 10).x).toBeLessThan(0);
-    expect(radarPointer(radarDisplayYaw(-0.7), 10).x).toBeGreaterThan(0);
+  it('positive world yaw displays left', () => {
+    expect(radarPointer(radarDirectionYaw(0.7, 0), 10).x).toBeLessThan(0);
+    expect(radarPointer(radarDirectionYaw(-0.7, 0), 10).x).toBeGreaterThan(0);
+  });
+
+  it('marker direction agrees with projected position', () => {
+    const p = projectRadar(60, 0, 0, 200, 38);
+    const angle = radarDirectionYaw(Math.PI / 2, 0);
+    expect(p.x * Math.sin(angle)).toBeGreaterThan(0);
+    expect(p.y * -Math.cos(angle)).toBeGreaterThanOrEqual(0);
   });
 
   it('scan pulse progresses and expires', () => {
@@ -51,9 +57,9 @@ describe('radar projection + orientation', () => {
     expect(pulseProgress(2200, 1000)).toBeNull();
   });
 
-  it('damage bearing is relative to own hull heading', () => {
+  it('damage bearing is camera-aligned and relative to own hull heading', () => {
     expect(radarBearing(0, 60, 0)).toBeCloseTo(0);
-    expect(radarBearing(60, 0, 0)).toBeCloseTo(Math.PI / 2);
+    expect(radarBearing(60, 0, 0)).toBeCloseTo(-Math.PI / 2);
     expect(radarBearing(60, 0, Math.PI / 2)).toBeCloseTo(0);
   });
 });

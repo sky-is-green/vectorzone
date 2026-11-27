@@ -69,7 +69,9 @@ const stats = document.getElementById('stats')!;
 const faceMat = new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.DoubleSide });
 const edgeMat = makeLineMaterial(PHOSPHOR, 2.4); // tanks: thickest
 const objectEdgeMat = makeLineMaterial(PHOSPHOR, 1.4); // structures: middle
-const effectEdgeMat = makeLineMaterial(PHOSPHOR, 1.8); // aircraft/missiles
+const effectEdgeMat = makeLineMaterial(PHOSPHOR, 1.8); // aircraft
+const missileEdgeMat = makeLineMaterial(0xffaa33, 2.6, { fog: false });
+const missileCoreMat = new THREE.MeshBasicMaterial({ color: 0xff6b2b, fog: false, depthWrite: false });
 const depotEdgeMat = makeLineMaterial(0xff4433, 1.8);
 const scanEdgeMat = makeLineMaterial(0x35e0ff, 1.8);
 
@@ -242,6 +244,40 @@ function missileGeometry(): THREE.BufferGeometry {
   g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3));
   return g;
 }
+
+// A small solid core keeps the missile readable when its wireframe is viewed
+// exactly nose-on and collapses toward a single pixel.
+const missileCoreGeo = new THREE.ConeGeometry(0.28, 1.4, 4);
+missileCoreGeo.rotateX(Math.PI / 2);
+
+function missileMarkerTexture(): THREE.CanvasTexture {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const x = c.getContext('2d')!;
+  x.clearRect(0, 0, 64, 64);
+  x.strokeStyle = '#ffaa33';
+  x.lineWidth = 5;
+  x.beginPath();
+  x.moveTo(32, 5);
+  x.lineTo(59, 32);
+  x.lineTo(32, 59);
+  x.lineTo(5, 32);
+  x.closePath();
+  x.stroke();
+  x.fillStyle = '#fff3c4';
+  x.fillRect(27, 27, 10, 10);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+const missileMarkerMat = new THREE.SpriteMaterial({
+  map: missileMarkerTexture(),
+  transparent: true,
+  fog: false,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending,
+});
 
 function bomberGeometry(): THREE.BufferGeometry {
   // a basic aeroplane, not a saucer (user direction 2026-11-25):
@@ -593,13 +629,30 @@ function frame(now: number): void {
   for (const m of world.missiles) {
     let g = missileGroups.get(m.id);
     if (!g) {
-      g = makeFatLines(missileGeometry(), effectEdgeMat);
+      g = makeFatLines(missileGeometry(), missileEdgeMat);
+      const core = new THREE.Mesh(missileCoreGeo, missileCoreMat);
+      core.position.z = 0.25;
+      g.add(core);
+      const marker = new THREE.Sprite(missileMarkerMat);
+      marker.scale.set(1.6, 1.6, 1.6);
+      g.add(marker);
       missileGroups.set(m.id, g);
       scene.add(g);
     }
     g.position.set(m.pos[0], m.pos[1], m.pos[2]);
     const dir = new THREE.Vector3(m.dir[0], m.dir[1], m.dir[2]).normalize();
     g.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
+    // Fog-free exhaust trail: remains visible when the body aligns with the
+    // horizon or is viewed end-on.
+    for (let i = 0; i < 2; i++) {
+      const back = 2.2 + i * 0.8;
+      smoke.spawn(
+        m.pos[0] - dir.x * back, m.pos[1] - dir.y * back, m.pos[2] - dir.z * back,
+        -dir.x * 2 + (Math.random() - 0.5), (Math.random() - 0.5), -dir.z * 2 + (Math.random() - 0.5),
+        0.45 + i * 0.15, tint.hazard[0], tint.hazard[1], tint.hazard[2], 1.3,
+        dir.x, dir.y, dir.z,
+      );
+    }
   }
   for (const [id, g] of missileGroups) {
     if (!world.missiles.some((m) => m.id === id)) {
@@ -828,6 +881,16 @@ function frame(now: number): void {
           ev.dir[1] * 12 + (Math.random() - 0.5) * 6,
           ev.dir[2] * 12 + (Math.random() - 0.5) * 6,
           0.15, tint.tracer[0], tint.tracer[1], tint.tracer[2], 0.6,
+        );
+      }
+    } else if (ev.kind === 'defenseFire') {
+      for (let i = 0; i < 5; i++) {
+        smoke.spawn(
+          ev.pos[0], ev.pos[1], ev.pos[2],
+          ev.dir[0] * 38 + (Math.random() - 0.5) * 3,
+          ev.dir[1] * 38 + (Math.random() - 0.5) * 3,
+          ev.dir[2] * 38 + (Math.random() - 0.5) * 3,
+          0.16, tint.hazard[0], tint.hazard[1], tint.hazard[2], 1.1,
         );
       }
     } else if (ev.kind === 'blockDestroyed') {

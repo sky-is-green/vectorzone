@@ -77,12 +77,19 @@ Everything above lives in the shared sim, seeded → identical on host and clien
 ### 5.2 Missile — the airborne committed threat
 
 - Spawns at the arena edge **11–16 m above ground**, visibly missile-shaped
-  (body, nose, swept fins, exhaust), and flies above the arena before diving.
-- ~60% are guided: they track a tank with a deliberately low **0.45 rad/s**
-  turn rate, so a moving tank can escape. The rest fly straight. Lifetime is
-  20 s so a 150 m approach can actually reach its target.
+  (body, nose, swept fins, exhaust), with a fog-free orange core, camera-facing
+  vector diamond, and exhaust trail so it remains readable at the horizon.
+- Initial guidance points at the target's real 3-D position. ~60% are guided:
+  they track with a deliberately low **0.45 rad/s** turn rate, so a moving tank
+  can escape. The rest fly straight.
+- Lifetime is distance-based (**20–50 s**) with a 280 m safety boundary; swept
+  3-D collision prevents a descending missile from passing over its target.
+- Target selection keeps the existing **55% player-lock chance**. The remaining
+  weighted pool favors supertanks and the bomber over light tanks, creating
+  point-defense spectacles without removing player pressure.
 - A player-targeted missile emits a **MISSILE LOCK** alert and is drawn on the
-  minimap as a pulsing red arrow. All live missiles appear as orange arrows.
+  minimap as a pulsing red arrow. All live missiles appear as orange arrows whose
+  heading uses the same camera-aligned projection as their position.
 - Shoot down for points; ground/tank impact produces a real explosion.
 
 ### 5.3 Supertank — the aggressive veteran
@@ -90,6 +97,9 @@ Everything above lives in the shared sim, seeded → identical on host and clien
 - Everything the slow tank does, faster: hull ~1.2× player, turret slew 120°/s, tighter cone, shorter cooldown.
 - **Flanks**: approach vectors offset from your heading; seeks cover or circles while firing.
 - **Faster investigation and engagement**, but still no firing without visual confirmation.
+- **Point defense**: a missile targeting a supertank triggers close-range
+  machine-gun bursts and a guaranteed intercept before impact. Bursts are visual
+  events, not extra shells, so they do not create radar reveals or self-damage.
 - More aggressive advance/cover/orbit timing; same human-like aim limits.
 - Still bound by every fairness rule above — beatable by movement, cover play, and focus fire.
 
@@ -103,6 +113,9 @@ Less saucer, more bomber — the default in **every** mode. Every **2 minutes**,
   fuselage, so it is actually possible to shoot.
 - **Bombs deny its flight path** on a cadence (~0.75 s between drops), plus opportunistic drops on any tank beneath it. Each drop is telegraphed by the universal ground ring (≥1.5 s).
 - **The information trap**: it's worth bonus points, but **shooting it pings your position** — a ~3 s radar blip visible to every player, and a memory refresh for every AI (in solo, the ping feeds the AI). The points piñata that tells everyone where you are.
+- **Point defense**: missiles targeting the bomber trigger earlier, longer-range
+  machine-gun bursts than the supertank's. The bomber always intercepts before
+  impact; the bursts are visual only and do not reveal it on radar.
 - A few hits kill it (first hit claims the bonus); otherwise it despawns on exit. **Radar-invisible until it fires** — each bomb drop blips its position under the universal gunfire rule, so you can hunt it by its own bombs.
 
 ### 5.5 Turret loss → 10-second self-destruct

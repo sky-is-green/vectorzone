@@ -56,6 +56,7 @@ export const RESPAWN_TICKS = 180; // 3 s deathcam / spectator window
 
 export type SimEvent =
   | { kind: 'fire'; pos: V3; dir: V3; owner: number }
+  | { kind: 'defenseFire'; pos: V3; dir: V3; owner: number; missileId: number }
   | { kind: 'shellImpact'; pos: V3 }
   | { kind: 'blockDestroyed'; pos: V3; by: number | null }
   | { kind: 'explosion'; pos: V3; radius: number; damage: number; source: Blast['source'] | 'airburst' }

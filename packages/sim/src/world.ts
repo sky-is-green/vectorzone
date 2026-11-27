@@ -617,7 +617,7 @@ export function hashWorld(w: World): string {
     `spawn${w.nextSpawnTick}:${w.nextSuperTick}:${w.nextMissileTick}`,
   );
   for (const m of w.missiles) {
-    parts.push(`m${m.id}:${m.pos.map((n) => n.toFixed(3))}:${m.dir.map((n) => n.toFixed(3))}:${m.targetId}:${m.tracking ? 1 : 0}`);
+    parts.push(`m${m.id}:${m.pos.map((n) => n.toFixed(3))}:${m.dir.map((n) => n.toFixed(3))}:${m.targetKind}:${m.targetId}:${m.tracking ? 1 : 0}:${m.age}:${m.maxAge}:${m.interceptTick ?? -1}:${m.interceptorId ?? -1}:${m.lastDefenseTick}`);
   }
   if (w.bomber) parts.push(`b${w.bomber.id}:${w.bomber.pos.map((n) => n.toFixed(3))}:${w.bomber.targetId}`);
   const s = parts.join(';');

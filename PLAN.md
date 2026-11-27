@@ -72,7 +72,7 @@ Naively, 300 blocks × (mesh + lines) × 10 tanks = 6,000 draw calls. Instead:
 - **Per rigid body, merge everything into ONE face geometry + ONE line geometry.** Two draw calls per body: a tank is hull + rotating turret = 4, a structure = 2. (Resolved M1: the independently-aimed turret cannot share static hull geometry.)
 - **Cull interior faces/edges**: only emit a block face where the neighboring cell is empty (Minecraft-style). Fewer triangles, and when a neighbor is destroyed the newly exposed interior faces appear automatically on rebuild.
 - Rebuild the merged geometry **only when damage occurs** (a few times per second at most), never per frame. A few hundred blocks rebuild in well under a millisecond.
-- **Line hierarchy** (user polish 2026-11-26): floor 1 px, tanks 2.4 px, structures 1.4 px, aircraft/missiles 1.8 px, horizon 1.1–1.2 px. `Line2` is used because WebGL `linewidth` is ignored on most platforms.
+- **Line hierarchy** (user polish 2026-11-26): floor 1 px, tanks 2.4 px, structures 1.4 px, aircraft 1.8 px, missiles 2.6 px plus a camera-facing vector marker, horizon 1.1–1.2 px. `Line2` is used because WebGL `linewidth` is ignored on most platforms.
 - Debris and particles: one pooled thin `LineSegments` cloud for the whole scene.
 
 ### 4.3 Glow & CRT (post-processing)

@@ -109,8 +109,11 @@ export {
   SCORE_VALUES,
   BOMBER_PERIOD,
   TELEGRAPH_TICKS,
+  MISSILE_MIN_TICKS,
+  MISSILE_MAX_TICKS,
   stepDirector,
   type Missile,
+  type MissileTargetKind,
   type Bomber,
   type Telegraph,
 } from './director';

@@ -41,6 +41,9 @@ tuning. A milestone with an un-run play-test is not fully done (BUILD.md §3).
 - [ ] Under fire from two visible enemies, AI keeps one target, flees purposefully, and still shoots when aligned.
 - [ ] Cover use looks intentional: AI moves to protected hull positions, not merely next to arbitrary objects.
 - [ ] Moving targets are led imperfectly; sharp turns still throw off AI aim.
+- [ ] Missile radar arrows agree with their movement direction after hull turns.
+- [ ] Missiles remain visible at the horizon and do not vanish early on far-side approaches.
+- [ ] Bomber/supertank point defense reads as purposeful machine-gun bursts, not random tracers.
 - [ ] Hazard telegraphs (rings, rumble) give enough warning in practice.
 - [ ] Radar readable at a glance; 30 m ring and blip decay understood without explanation.
 - [ ] Bomber pass: threat lane and information trap both legible.
@@ -66,6 +69,7 @@ tuning. A milestone with an un-run play-test is not fully done (BUILD.md §3).
 | F9 | 2026-11-26 | AI loop | User reported wobble/stopping/no investigation; replaced with PATROL→INVESTIGATE→ENGAGE loop. Needs human confirmation | Watch no-info patrol, ping investigation behind cover, visual-only fire, target reset | **open — awaiting human session** |
 | F10 | 2026-11-26 | Damage feedback | AI retaliation targeting and player radar damage-bearing need human confirmation | Get hit from a known direction; verify rim arrow and AI turns on attacker | **open — awaiting human session** |
 | F11 | 2026-11-26 | AI decision model | Corrected private-target leakage, hidden-target switching, fake cover, unthrottled searches, and missing aim lead; automated checks pass but combat feel is unverified | Fight two AI at once; confirm stable closest-visible target, purposeful cover flee, no permanent fleeing, believable lead/misses | **open — awaiting human session** |
+| F12 | 2026-11-27 | Missiles | Fixed radar heading/position mismatch, far-target expiry, 3-D miss window, and horizon invisibility; added weighted bomber/super targeting and point-defense bursts | Turn while tracking a missile; verify arrow direction, horizon readability, no early vanish, and spectacular bomber/super defense | **open — awaiting human session** |
 | F8 | 2026-11-26 | Spectator | Death spectator cycling, killer-first selection, chase camera, countdown, and respawn reset need human feel confirmation | Die with multiple living tanks; cycle with arrows; confirm smooth camera and 3s reset | **open — awaiting human session** |
 
 ## Rule

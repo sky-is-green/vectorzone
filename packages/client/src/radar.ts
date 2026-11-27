@@ -10,7 +10,7 @@ export function projectRadar(
 ): RadarPoint {
   const c = Math.cos(heading);
   const s = Math.sin(heading);
-  let x = (dx * c - dz * s) * (radius / range);
+  let x = (-dx * c + dz * s) * (radius / range);
   let y = -(dx * s + dz * c) * (radius / range);
   const len = Math.hypot(x, y);
   const clamped = len > radius;
@@ -35,10 +35,10 @@ export function radarPointer(yaw: number, length: number): { x: number; y: numbe
   return { x: Math.sin(yaw) * length, y: -Math.cos(yaw) * length };
 }
 
-/** World yaw + turns left in the +Z camera; the minimap's display yaw is
- * negated so it still reads left as left. */
-export function radarDisplayYaw(worldYaw: number): number {
-  return -worldYaw;
+/** Camera-aligned radar yaw: 0 = up, positive = screen-right. World yaw is
+ * positive-left because the camera looks along +Z, so the signs oppose. */
+export function radarDirectionYaw(worldYaw: number, ownHeading = 0): number {
+  return ownHeading - worldYaw;
 }
 
 /** Expanding HUD pulse progress, or null outside its lifetime. */
@@ -49,5 +49,5 @@ export function pulseProgress(now: number, startedAt: number, duration = 1200): 
 
 /** Bearing from own hull to a world point, for heading-up radar markers. */
 export function radarBearing(dx: number, dz: number, ownHeading: number): number {
-  return Math.atan2(dx, dz) - ownHeading;
+  return ownHeading - Math.atan2(dx, dz);
 }

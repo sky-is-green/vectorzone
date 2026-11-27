@@ -5,7 +5,7 @@
  */
 import type { Known } from '@vectorzone/sim';
 import type { Palette } from './palette';
-import { projectRadar, radarDisplayYaw, radarPointer, relativeHeading } from './radar';
+import { projectRadar, radarDirectionYaw, radarPointer } from './radar';
 
 export interface HudMissile {
   id: number;
@@ -126,7 +126,7 @@ export function createHud(): {
     ctx.stroke();
     // turret-aligned pointer (was a cosmetic time-driven sweep that appeared
     // to move opposite the gun)
-    const sweep = radarDisplayYaw(s.turretYaw);
+    const sweep = radarDirectionYaw(s.heading + s.turretYaw, s.heading);
     const pointer = radarPointer(sweep, RADAR_R);
     ctx.strokeStyle = hud + '55';
     ctx.beginPath();
@@ -135,7 +135,7 @@ export function createHud(): {
     ctx.stroke();
 
     const place = (x: number, z: number) => {
-      const p = projectRadar(x - s.x, z - s.z, radarDisplayYaw(s.heading), RADAR_RANGE, RADAR_R - 3);
+      const p = projectRadar(x - s.x, z - s.z, s.heading, RADAR_RANGE, RADAR_R - 3);
       return { x: cx + p.x, y: cy + p.y };
     };
 
@@ -151,14 +151,9 @@ export function createHud(): {
           const color = enemyColor(id, alpha, isSuper);
           const heading = s.tankHeadings.get(id) ?? k.heading;
           const turretYaw = s.tankTurrets.get(id) ?? k.turretYaw ?? 0;
-          const displayHeading = radarDisplayYaw(heading);
-          const ownDisplayHeading = radarDisplayYaw(s.heading);
-          triangle(p.x, p.y, relativeHeading(displayHeading, ownDisplayHeading), isSuper ? 6 : 4.5, color);
+          triangle(p.x, p.y, radarDirectionYaw(heading, s.heading), isSuper ? 6 : 4.5, color);
           // turret heading tick: the gun points at hull heading + turret yaw
-          const gunAngle = relativeHeading(
-            radarDisplayYaw(heading + turretYaw),
-            ownDisplayHeading,
-          );
+          const gunAngle = radarDirectionYaw(heading + turretYaw, s.heading);
           ctx.strokeStyle = color;
           ctx.beginPath();
           ctx.moveTo(p.x, p.y);
@@ -198,13 +193,13 @@ export function createHud(): {
       for (const m of s.missiles) {
         const p = place(m.x, m.z);
         const pulse = m.targeted ? 5 + Math.sin(s.tick * 0.4) * 1.5 : 3.5;
-        triangle(p.x, p.y, relativeHeading(radarDisplayYaw(m.heading), radarDisplayYaw(s.heading)), pulse, m.targeted ? '#ff4433' : '#ffaa33');
+        triangle(p.x, p.y, radarDirectionYaw(m.heading, s.heading), pulse, m.targeted ? '#ff4433' : '#ffaa33');
       }
 
       // Bomber: actual position + actual flight heading (not a fixed top tick).
       if (s.bomber && s.bomberBlip) {
         const p = place(s.bomber.x, s.bomber.z);
-        triangle(p.x, p.y, relativeHeading(radarDisplayYaw(s.bomber.heading), radarDisplayYaw(s.heading)), 6, hud);
+        triangle(p.x, p.y, radarDirectionYaw(s.bomber.heading, s.heading), 6, hud);
       }
     } else {
       ctx.fillStyle = hud + '66';
@@ -227,7 +222,7 @@ export function createHud(): {
 
     // own hull arrow + turret tick
     triangle(cx, cy, 0, 6, P.worldCss);
-    const turretTick = radarPointer(radarDisplayYaw(s.turretYaw), 11);
+    const turretTick = radarPointer(radarDirectionYaw(s.heading + s.turretYaw, s.heading), 11);
     ctx.strokeStyle = hud;
     ctx.beginPath();
     ctx.moveTo(cx, cy);
