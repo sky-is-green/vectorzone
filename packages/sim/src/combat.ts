@@ -42,6 +42,7 @@ export interface Blast {
   radius: number;
   damage: number;
   source: 'ammo' | 'missile' | 'bomb' | 'volcano' | 'meteor' | 'selfDestruct';
+  by?: number | null;
 }
 
 export const VOLCANO_BLAST_RADIUS = 7;

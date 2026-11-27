@@ -185,6 +185,17 @@ describe('missile targeting + lifetime', () => {
 });
 
 describe('missile point defense', () => {
+  it('retains bomber attribution through bomb damage and player death', () => {
+    const w = quietWorld();
+    w.bomber = bomber({ pos: [0, 15, 0], nextBomb: 1, targetId: 0 });
+    stepWorld(w, [N]);
+    expect(w.telegraphs.some((t) => t.kind === 'bomb' && t.ownerId === 800)).toBe(true);
+    w.telegraphs = [];
+    w.pendingExplosions.push({ pos: [0, 0.5, 0], radius: 10, damage: 99, source: 'bomb', by: 800 });
+    stepWorld(w, [N]);
+    expect(w.events.some((e) => e.kind === 'tankKilled' && e.id === 0 && e.by === 800)).toBe(true);
+  });
+
   it('self-heals an unscheduled manually introduced bomber', () => {
     const w = quietWorld();
     w.tanks[0].alive = false;

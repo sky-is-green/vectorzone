@@ -77,6 +77,8 @@ DORMANT ──► RUMBLE ──► ERUPT ──► COOLDOWN ──► DORMANT
   or horizontal flash bar.
 - They never damage tanks, create radar contacts, or shake the camera, and use
   the existing particle pool only—no extra meshes, materials, or sim state.
+- AA stops launching as soon as the match enters `over`; already-rendered
+  particles fade out normally.
 
 ---
 

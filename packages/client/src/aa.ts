@@ -42,6 +42,11 @@ export class AmbientAa {
     return this.explosions;
   }
 
+  clear(): void {
+    this.shells = [];
+    this.recent = [];
+  }
+
   /** Useful for deterministic tests and the browser debug hook. */
   forceVolley(rng: () => number = Math.random, viewHeading = 0): void {
     this.spawnVolley(rng, viewHeading);

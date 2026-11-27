@@ -201,6 +201,7 @@ function destroyCell(w: World, ctx: GridCtx, c: V3, damaged: Damaged, by: number
   damaged.set(ctx.g, ctx);
   if (ctx.tank && by !== null) {
     w.threats.set(ctx.tank.id, { tick: w.tick, from: by });
+    w.lastHitBy.set(ctx.tank.id, by);
     recordIncomingFire(w, ctx.tank.id, by);
   }
   w.events.push({ kind: 'blockDestroyed', pos: wp, by });
@@ -224,6 +225,7 @@ function damageCell(w: World, ctx: GridCtx, c: V3, dmg: number, damaged: Damaged
   damaged.set(ctx.g, ctx);
   if (ctx.tank && by !== null) {
     w.threats.set(ctx.tank.id, { tick: w.tick, from: by });
+    w.lastHitBy.set(ctx.tank.id, by);
     recordIncomingFire(w, ctx.tank.id, by);
   }
   if (b.hp <= 0) destroyCell(w, ctx, c, damaged, by);
@@ -312,7 +314,7 @@ function stepExplosions(w: World, damaged: Damaged): void {
             if (!getCell(ctx.g, x, y, z)) continue;
             const c: V3 = [x, y, z];
             if (dist(cellWorld(ctx, c), blast.pos) <= blast.radius) {
-              damageCell(w, ctx, c, blast.damage, damaged, null);
+              damageCell(w, ctx, c, blast.damage, damaged, blast.by ?? null);
             }
           }
         }

@@ -92,6 +92,15 @@ describe('ambient distant AA fire', () => {
     expect(maxActive).toBeGreaterThanOrEqual(3);
   });
 
+  it('clears active fire when the match ends', () => {
+    const aa = new AmbientAa(rng(23));
+    aa.forceVolley(rng(23));
+    expect(aa.activeCount).toBeGreaterThan(0);
+    aa.clear();
+    expect(aa.activeCount).toBe(0);
+    expect(aa.recentEvents).toEqual([]);
+  });
+
   it('is deterministic for the same seed', () => {
     const run = () => {
       const random = rng(17);

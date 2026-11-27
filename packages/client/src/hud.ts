@@ -266,25 +266,26 @@ export function createHud(): {
       ctx.stroke();
     }
 
-    // spectator label + respawn countdown
-    if (s.spectator) {
+    // Spectator controls sit below the action, clear of the centered tank.
+    const spectatorY = h * 0.68;
+    const spectatorLabelText = (text: string) => {
       ctx.font = 'bold 13px monospace';
       ctx.textAlign = 'center';
+      const width = ctx.measureText(text).width;
+      ctx.fillStyle = hud + '18';
+      ctx.fillRect(w / 2 - width / 2 - 12, spectatorY - 19, width + 24, 28);
       ctx.fillStyle = hud;
-      ctx.fillText(
+      ctx.fillText(text, w / 2, spectatorY);
+      ctx.textAlign = 'left';
+    };
+    if (s.spectator) {
+      spectatorLabelText(
         s.respawnReady
           ? `SPECTATING ${s.spectator.label} · ←/→ CYCLE · PRESS SPACE TO RESPAWN`
           : `SPECTATING ${s.spectator.label} · ←/→ CYCLE · RESPAWN ${Math.ceil(s.spectator.secondsLeft)}s`,
-        w / 2,
-        h / 2 + 54,
       );
-      ctx.textAlign = 'left';
     } else if (s.respawnReady) {
-      ctx.font = 'bold 13px monospace';
-      ctx.textAlign = 'center';
-      ctx.fillStyle = hud;
-      ctx.fillText('PRESS SPACE TO RESPAWN', w / 2, h / 2 + 54);
-      ctx.textAlign = 'left';
+      spectatorLabelText('PRESS SPACE TO RESPAWN');
     }
 
     // self-destruct countdown: centered above the status readout

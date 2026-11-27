@@ -42,6 +42,7 @@ import { buildPanel, loadSettings, saveSettings, type Settings } from './setting
 import { pulseProgress, radarBearing, radarViewHeading } from './radar';
 import { livingSpectators, nextSpectatorId, spectatorLabel } from './spectator';
 import { explosionShake, impactShake } from './feedback';
+import { beginDeathCam, updateDeathCam, type DeathCamState } from './deathcam';
 import './style.css';
 
 const PHOSPHOR = 0x39ff6b;
@@ -82,6 +83,7 @@ const world = createWorld(0xb477e2, settings.map);
 let tank = world.tanks[0];
 let spectatedId: number | null = null;
 let lastKillerId: number | null = null;
+let deathCam: DeathCamState | null = null;
 
 interface Body {
   group: THREE.Group;
@@ -426,6 +428,9 @@ const debug: { cam: { p: [number, number, number]; l: [number, number, number] }
   get spectatorId() {
     return spectatedId;
   },
+  get deathStage() {
+    return deathCam?.stage ?? null;
+  },
   post,
   scene,
   command: readCommand,
@@ -506,21 +511,7 @@ function frame(now: number): void {
     accumulator = 0;
   }
   tank = world.tanks[0];
-  const spectators = tank.alive ? [] : livingSpectators(world.tanks, 0);
-  if (tank.alive) {
-    spectatedId = null;
-  } else if (spectators.length) {
-    if (spectatedId === null) {
-      spectatedId = spectators.find((t) => t.id === lastKillerId)?.id ?? spectators[0].id;
-    } else if (!spectators.some((t) => t.id === spectatedId)) {
-      spectatedId = spectators[0].id;
-    }
-  }
-  const spectatedTank = spectators.find((t) => t.id === spectatedId) ?? null;
-  if (world.phase === 'over' && !matchReported) {
-    matchReported = true;
-    showGameOver();
-  }
+  if (tank.alive) deathCam = null;
 
   refreshBody(hull, tank.hull);
   refreshBody(turret, tank.turret);
@@ -552,7 +543,8 @@ function frame(now: number): void {
   scen.volcanoMat.color.setHex(
     vs === 'erupt' ? 0xff6b2b : vs === 'rumble' ? 0x8a4a20 : PALETTES[settings.palette % PALETTES.length].dim,
   );
-  for (const event of aa.update(dt, Math.random, radarViewHeading(tank.heading, tank.turretYaw))) {
+  if (world.phase === 'play') {
+    for (const event of aa.update(dt, Math.random, radarViewHeading(tank.heading, tank.turretYaw))) {
     if (event.kind === 'tracer') {
       smoke.spawn(
         event.pos[0], event.pos[1], event.pos[2],
@@ -585,6 +577,9 @@ function frame(now: number): void {
         );
       }
     }
+    }
+  } else {
+    aa.clear();
   }
   smoke.update(dt);
 
@@ -896,6 +891,7 @@ function frame(now: number): void {
     if (ev.kind === 'tankKilled') {
       if (ev.id === 0) {
         lastKillerId = ev.by;
+        deathCam = beginDeathCam(now, ev.pos, ev.by, world.bomber?.id ?? null);
         spectatedId = null;
         killfeed.push({ text: ev.cause === 'selfDestruct' ? 'YOU SELF-DESTRUCTED' : ev.by === null ? 'THE ZONE KILLED YOU' : 'ENEMY KILLED YOU', born: now });
       } else if (ev.cause === 'selfDestruct') {
@@ -971,6 +967,31 @@ function frame(now: number): void {
     }
   }
 
+  const spectators = tank.alive ? [] : livingSpectators(world.tanks, 0);
+  if (!tank.alive && deathCam) {
+    const killerId = deathCam.killerId;
+    const killerAvailable = killerId !== null && (
+      (world.bomber?.alive === true && world.bomber.id === killerId) ||
+      spectators.some((t) => t.id === killerId)
+    );
+    deathCam = updateDeathCam(deathCam, now, killerAvailable);
+  }
+  const canSpectate = !deathCam || deathCam.stage === 'spectator';
+  if (tank.alive) {
+    spectatedId = null;
+  } else if (canSpectate && spectators.length) {
+    if (spectatedId === null) {
+      spectatedId = spectators.find((t) => t.id === lastKillerId)?.id ?? spectators[0].id;
+    } else if (!spectators.some((t) => t.id === spectatedId)) {
+      spectatedId = spectators[0].id;
+    }
+  }
+  const spectatedTank = canSpectate ? spectators.find((t) => t.id === spectatedId) ?? null : null;
+  if (world.phase === 'over' && !matchReported && canSpectate) {
+    matchReported = true;
+    showGameOver();
+  }
+
   // sync transforms from sim state
   hull.group.position.set(tank.x, 0, tank.z);
   hull.group.rotation.y = tank.heading;
@@ -981,6 +1002,37 @@ function frame(now: number): void {
   if (debug.cam) {
     camera.position.set(...debug.cam.p);
     camera.lookAt(...debug.cam.l);
+  } else if (deathCam?.stage === 'explosion') {
+    const age = (now - deathCam.startedAt) / 1000;
+    const a = age * 0.25;
+    camera.position.set(
+      deathCam.pos[0] + Math.sin(a) * 7,
+      deathCam.pos[1] + 3.5,
+      deathCam.pos[2] + Math.cos(a) * 7,
+    );
+    camera.lookAt(deathCam.pos[0], deathCam.pos[1], deathCam.pos[2]);
+  } else if (deathCam?.stage === 'killer') {
+    const killerId = deathCam.killerId;
+    const killerBomber = world.bomber?.alive && world.bomber.id === killerId ? world.bomber : null;
+    const killerTank = world.tanks.find((t) => t.alive && t.id === killerId);
+    if (killerBomber) {
+      camera.position.set(
+        killerBomber.pos[0] - Math.sin(Math.atan2(killerBomber.dir[0], killerBomber.dir[2])) * 16,
+        killerBomber.pos[1] + 5,
+        killerBomber.pos[2] - Math.cos(Math.atan2(killerBomber.dir[0], killerBomber.dir[2])) * 16,
+      );
+      camera.lookAt(killerBomber.pos[0], killerBomber.pos[1], killerBomber.pos[2]);
+    } else if (killerTank) {
+      camera.position.set(
+        killerTank.x - Math.sin(killerTank.heading) * 12,
+        6.5,
+        killerTank.z - Math.cos(killerTank.heading) * 12,
+      );
+      camera.lookAt(killerTank.x, 1.2, killerTank.z);
+    } else {
+      camera.position.set(deathCam.pos[0] + 6, 4, deathCam.pos[2] + 6);
+      camera.lookAt(deathCam.pos[0], deathCam.pos[1], deathCam.pos[2]);
+    }
   } else if (!tank.alive && spectatedTank) {
     // spectator chase cam: watch the selected living tank
     camera.position.set(
@@ -1097,7 +1149,7 @@ function frame(now: number): void {
       label: spectatorLabel(spectatedTank, world.brains.get(spectatedTank.id)?.kind),
       secondsLeft: Math.max(0, (world.respawnTick - world.tick) / 60),
     } : null,
-    respawnReady: !tank.alive && world.respawnTick > 0 && world.tick >= world.respawnTick,
+    respawnReady: canSpectate && !tank.alive && world.respawnTick > 0 && world.tick >= world.respawnTick,
     now,
   });
 

@@ -64,6 +64,7 @@ export interface Telegraph {
   impactTick: number;
   radius: number;
   kind: 'bomb' | 'volcano' | 'meteor';
+  ownerId?: number;
 }
 
 export const SCORE_VALUES = { slow: 100, missile: 250, super: 500, bomber: 1000, block: 5 };
@@ -578,7 +579,7 @@ function stepBomber(w: World): void {
         break;
       }
     }
-    w.telegraphs.push({ x: tx, z: tz, impactTick: w.tick + TELEGRAPH_TICKS, radius: 2, kind: 'bomb' });
+    w.telegraphs.push({ x: tx, z: tz, impactTick: w.tick + TELEGRAPH_TICKS, radius: 2, kind: 'bomb', ownerId: b.id });
     w.events.push({ kind: 'bombTelegraph', pos: [tx, 0, tz] });
     b.nextBomb = w.tick + BOMB_DROP_TICKS;
   }
@@ -615,6 +616,7 @@ function stepTelegraphs(w: World): void {
       radius: volcano ? VOLCANO_BLAST_RADIUS : meteor ? 4 : t.radius,
       damage: volcano ? VOLCANO_BLAST_DAMAGE : meteor ? 5 : 3,
       source: volcano ? 'volcano' : meteor ? 'meteor' : 'bomb',
+      by: t.ownerId ?? null,
     });
     if (t.kind !== 'bomb') bombAftermath(w, t.x, t.z, t.kind);
   }
