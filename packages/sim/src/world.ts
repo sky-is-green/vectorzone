@@ -94,7 +94,8 @@ export interface World {
   nextSpawnTick: number;
   nextSuperTick: number;
   nextMissileTick: number;
-  nextDefenseVolleyTick: number;
+  nextBomberVolleyTick: number;
+  nextSuperVolleyTick: number;
   nextBomberTick: number;
   respawnTick: number;
   nextLifeAt: number;
@@ -141,7 +142,8 @@ export function createWorld(seed: number, map: MapId = 'classic'): World {
     nextSpawnTick: 120,
     nextSuperTick: 9000, // first hunter at ~2.5 min, then every 2-3 min
     nextMissileTick: 1800,
-    nextDefenseVolleyTick: 1e9,
+    nextBomberVolleyTick: 1e9,
+    nextSuperVolleyTick: 1e9,
     nextBomberTick: BOMBER_PERIOD,
     respawnTick: 0,
     nextLifeAt: 10000,
@@ -616,7 +618,7 @@ export function hashWorld(w: World): string {
     `fen${w.fences.filter((f) => fenceAlive(w, f)).length}`,
     `threat${[...w.threats.entries()].sort((a, b) => a[0] - b[0]).map(([id, v]) => `${id}:${v.tick}:${v.from}`).join(',')}`,
     `incoming${[...w.incomingFire.entries()].sort((a, b) => a[0] - b[0]).map(([id, attackers]) => `${id}:${[...attackers.entries()].sort((a, b) => a[0] - b[0]).map(([from, tick]) => `${from}.${tick}`).join(',')}`).join(',')}`,
-    `spawn${w.nextSpawnTick}:${w.nextSuperTick}:${w.nextMissileTick}:${w.nextDefenseVolleyTick}`,
+    `spawn${w.nextSpawnTick}:${w.nextSuperTick}:${w.nextMissileTick}:${w.nextBomberVolleyTick}:${w.nextSuperVolleyTick}`,
   );
   for (const m of w.missiles) {
     parts.push(`m${m.id}:${m.pos.map((n) => n.toFixed(3))}:${m.dir.map((n) => n.toFixed(3))}:${m.targetKind}:${m.targetId}:${m.mode}:${m.acquireRange}:${m.scale}:${m.tracking ? 1 : 0}:${m.age}:${m.maxAge}:${m.interceptTick ?? -1}:${m.interceptorId ?? -1}:${m.lastDefenseTick}`);

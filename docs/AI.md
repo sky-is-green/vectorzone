@@ -90,9 +90,10 @@ Everything above lives in the shared sim, seeded → identical on host and clien
 - Target selection keeps the existing **55% player-lock chance**. The remaining
   weighted pool favors supertanks and the bomber over light tanks, creating
   point-defense spectacles without removing player pressure.
-- **Defense volleys**: while a bomber lives, 3–5 smaller/faster missiles launch
-  against it every 9–14 s. Supertanks receive similar 3–4 missile volleys every
-  12–18 s. These use separate active slots from normal player-pressure missiles.
+- **Defense volleys**: while a bomber lives, its first 3–5 smaller/faster
+  missiles launch after 6 s, then every 9–14 s. Supertanks receive 3–4 after
+  8 s, then every 12–18 s. Volleys launch from a 90–140 m stand-off ring and use
+  separate active slots from normal player-pressure missiles.
 - A player-targeted missile emits a **MISSILE LOCK** alert and is drawn on the
   minimap as a pulsing red arrow. All live missiles appear as orange arrows whose
   heading uses the same camera-aligned projection as their position.

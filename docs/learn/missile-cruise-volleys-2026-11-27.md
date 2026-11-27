@@ -39,3 +39,26 @@ bomber volley was visible with trails and all four were intercepted while the
 bomber survived. Zero console errors.
 
 Full gate: 156.9 KB gzipped.
+
+## Defense-volley reliability follow-up
+
+The original scheduler worked in headless and deployed-bundle probes, but it
+used one shared timer initialized only by director spawns. A manually restored
+bomber could remain unscheduled, and arena-edge launches delayed the first
+visible defense burst by 17 seconds in the reproduction.
+
+Changes:
+
+- Independent, self-healing bomber and supertank timers.
+- First volley after 6 s for the bomber, 8 s for the supertank.
+- Stand-off launches 90–140 m from the defender instead of the arena edge.
+- Explicit `defenseVolley` event for deterministic observation.
+- Natural-spawn regression tests now cover bomber and supertank schedules,
+  prompt point defense, manual-bomber recovery, and independent timers.
+
+Reliability gate: 163 tests; full build 157.0 KB gzipped.
+
+Browser natural-spawn probes (no forced timers): bomber volley delay 360 ticks,
+first defense 109 ticks after launch, four missiles, minimum stand-off 89.8 m;
+supertank volley delay 480 ticks, first defense 195 ticks after launch, four
+missiles. Zero console errors.

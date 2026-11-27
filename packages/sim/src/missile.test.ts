@@ -18,7 +18,8 @@ function quietWorld(seed = 5) {
   w.nextSpawnTick = 1e9;
   w.nextSuperTick = 1e9;
   w.nextMissileTick = 1e9;
-  w.nextDefenseVolleyTick = 1e9;
+  w.nextBomberVolleyTick = 1e9;
+  w.nextSuperVolleyTick = 1e9;
   w.nextBomberTick = 1e9;
   w.nextStormTick = 1e9;
   w.nextMeteorTick = 1e9;
@@ -182,15 +183,88 @@ describe('missile targeting + lifetime', () => {
 });
 
 describe('missile point defense', () => {
+  it('self-heals an unscheduled manually introduced bomber', () => {
+    const w = quietWorld();
+    w.tanks[0].alive = false;
+    w.bomber = bomber();
+    for (let i = 0; i < 361; i++) stepWorld(w, [N]);
+    expect(w.missiles.some((m) => m.targetKind === 'bomber' && m.scale < 1)).toBe(true);
+  });
+
+  it('naturally schedules a prompt volley during a director-spawned bomber run', () => {
+    const w = quietWorld();
+    w.nextBomberTick = 1;
+    w.structures = [];
+    let spawn = -1;
+    let volley = -1;
+    let defense = -1;
+    for (let i = 0; i < 1100; i++) {
+      const a = i / 90;
+      w.tanks[0].x = Math.sin(a) * 55;
+      w.tanks[0].z = Math.cos(a) * 55;
+      w.tanks[0].heading = a + Math.PI / 2;
+      w.tanks[0].speed = 0;
+      stepWorld(w, [N]);
+      if (w.bomber && spawn < 0) spawn = w.tick;
+      if (volley < 0 && w.events.some((e) => e.kind === 'defenseVolley' && e.defenderId === w.bomber?.id)) {
+        volley = w.tick;
+      }
+      if (defense < 0 && w.events.some((e) => e.kind === 'defenseFire' && e.owner === w.bomber?.id)) {
+        defense = w.tick;
+      }
+      if (defense >= 0) break;
+    }
+    expect(spawn).toBeGreaterThan(0);
+    expect(volley).toBeGreaterThan(spawn);
+    expect(volley - spawn).toBeLessThanOrEqual(361);
+    expect(defense).toBeGreaterThan(volley);
+    expect(defense - volley).toBeLessThan(600);
+  });
+
+  it('naturally schedules supertank volleys and point defense without a bomber', () => {
+    const w = quietWorld();
+    w.nextSuperTick = 1;
+    let superId = -1;
+    let defense = -1;
+    for (let i = 0; i < 1400; i++) {
+      stepWorld(w, [N]);
+      if (superId < 0) superId = w.tanks.find((t) => w.brains.get(t.id)?.kind === 'super')?.id ?? -1;
+      if (defense < 0 && w.events.some((e) => e.kind === 'defenseFire' && e.owner === superId)) {
+        defense = w.tick;
+      }
+      if (defense >= 0) break;
+    }
+    expect(superId).toBeGreaterThan(0);
+    expect(defense).toBeGreaterThan(superId);
+  });
+
+  it('keeps bomber and supertank volley schedules independent', () => {
+    const w = quietWorld();
+    w.tanks[0].alive = false;
+    const superTank = createEnemyTank(1, 'super', 0, 0, 0);
+    superTank.spawnTick = -1000;
+    w.tanks.push(superTank);
+    w.brains.set(1, createBrain('super'));
+    w.bomber = bomber();
+    w.nextBomberVolleyTick = 1;
+    w.nextSuperVolleyTick = 1;
+    stepWorld(w, [N]);
+    expect(w.missiles.filter((m) => m.targetKind === 'bomber').length).toBeGreaterThanOrEqual(3);
+    expect(w.missiles.filter((m) => m.targetId === 1).length).toBeGreaterThanOrEqual(3);
+  });
+
   it('launches 3-5 small fast missiles per bomber defense volley', () => {
     const w = quietWorld();
     w.tanks[0].alive = false;
     w.bomber = bomber();
-    w.nextDefenseVolleyTick = 1;
+    w.nextBomberVolleyTick = 1;
     stepWorld(w, [N]);
+    expect(w.events.some((e) => e.kind === 'defenseVolley' && e.defenderId === 800)).toBe(true);
     expect(w.missiles.length).toBeGreaterThanOrEqual(3);
     expect(w.missiles.length).toBeLessThanOrEqual(5);
     for (const m of w.missiles) {
+      expect(Math.hypot(m.pos[0] - w.bomber!.pos[0], m.pos[2] - w.bomber!.pos[2])).toBeGreaterThan(70);
+      expect(Math.hypot(m.pos[0] - w.bomber!.pos[0], m.pos[2] - w.bomber!.pos[2])).toBeLessThan(180);
       expect(m.targetKind).toBe('bomber');
       expect(m.targetId).toBe(800);
       expect(m.scale).toBeLessThan(1);
@@ -206,7 +280,7 @@ describe('missile point defense', () => {
     superTank.spawnTick = -1000;
     w.tanks.push(superTank);
     w.brains.set(1, createBrain('super'));
-    w.nextDefenseVolleyTick = 1;
+    w.nextSuperVolleyTick = 1;
     stepWorld(w, [N]);
     expect(w.missiles.length).toBeGreaterThanOrEqual(3);
     expect(w.missiles.length).toBeLessThanOrEqual(4);

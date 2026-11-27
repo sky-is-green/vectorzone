@@ -115,7 +115,7 @@ function spawnTank(w: World, kind: AiKind): void {
   w.brains.set(t.id, createBrain(kind));
   if (kind === 'super') {
     w.events.push({ kind: 'superSpawn', pos: [p.x, 1, p.z] });
-    w.nextDefenseVolleyTick = w.tick + 720;
+    w.nextSuperVolleyTick = w.tick + 480;
   }
 }
 
@@ -170,6 +170,7 @@ interface MissileSpawnOptions {
   target?: MissileTarget;
   small?: boolean;
   speed?: [number, number];
+  standOff?: [number, number];
 }
 
 export function spawnMissile(w: World, options: MissileSpawnOptions = {}): void {
@@ -183,7 +184,15 @@ export function spawnMissile(w: World, options: MissileSpawnOptions = {}): void 
     : weightedMissileTarget(w, targets));
   const a = w.rng.next() * Math.PI * 2;
   const altitude = options.small ? 20 + w.rng.next() * 4 : 18 + w.rng.next() * 6;
-  const pos: V3 = [Math.sin(a) * 205, altitude, Math.cos(a) * 205];
+  const launchRadius = options.standOff
+    ? options.standOff[0] + w.rng.next() * (options.standOff[1] - options.standOff[0])
+    : 205;
+  const center = options.standOff ? { x: target.pos[0], z: target.pos[2] } : { x: 0, z: 0 };
+  const pos: V3 = [
+    clamp(center.x + Math.sin(a) * launchRadius, -250, 250),
+    altitude,
+    clamp(center.z + Math.cos(a) * launchRadius, -250, 250),
+  ];
   const tracking = options.small ? true : w.rng.next() < 0.6;
   const speedRange = options.speed ?? [14, 18];
   const speed = speedRange[0] + w.rng.next() * (speedRange[1] - speedRange[0]);
@@ -218,24 +227,18 @@ export function spawnMissile(w: World, options: MissileSpawnOptions = {}): void 
   if (target.kind === 'tank' && target.id === 0) w.events.push({ kind: 'missileLock', id, pos });
 }
 
-function defenseVolleyTarget(w: World): MissileTarget | null {
-  const b = w.bomber;
-  if (b?.alive) return { kind: 'bomber', id: b.id, weight: 0, pos: [...b.pos] };
-  const superTank = w.tanks.find((t) => t.alive && w.brains.get(t.id)?.kind === 'super');
-  return superTank
-    ? { kind: 'tank', id: superTank.id, weight: 0, pos: [superTank.x, 1, superTank.z] }
-    : null;
-}
-
 function spawnDefenseVolley(w: World, target: MissileTarget): void {
   const plane = target.kind === 'bomber';
   const count = plane ? 3 + Math.floor(w.rng.next() * 3) : 3 + Math.floor(w.rng.next() * 2);
   for (let i = 0; i < count; i++) {
-    spawnMissile(w, { target, small: true, speed: [24, 30] });
+    spawnMissile(w, { target, small: true, speed: [24, 30], standOff: [90, 140] });
   }
-  w.nextDefenseVolleyTick = w.tick + (plane
+  const delay = plane
     ? 540 + Math.floor(w.rng.next() * 300)
-    : 720 + Math.floor(w.rng.next() * 360));
+    : 720 + Math.floor(w.rng.next() * 360);
+  if (plane) w.nextBomberVolleyTick = w.tick + delay;
+  else w.nextSuperVolleyTick = w.tick + delay;
+  w.events.push({ kind: 'defenseVolley', defenderId: target.id, count, pos: [...target.pos] });
 }
 
 export function stepDirector(w: World): void {
@@ -284,13 +287,29 @@ export function stepDirector(w: World): void {
         targetId: target.id,
       };
       w.nextBomberTick = w.tick + BOMBER_PERIOD;
-      w.nextDefenseVolleyTick = w.tick + 720;
+      w.nextBomberVolleyTick = w.tick + 360;
       w.events.push({ kind: 'bomberInbound', pos: [sx, 15, sz] });
     }
-    const defenseTarget = defenseVolleyTarget(w);
-    if (defenseTarget && w.tick >= w.nextDefenseVolleyTick) {
-      if (w.missiles.length < 10) spawnDefenseVolley(w, defenseTarget);
-      else w.nextDefenseVolleyTick = w.tick + 120;
+    const bomberTarget: MissileTarget | null = w.bomber?.alive
+      ? { kind: 'bomber', id: w.bomber.id, weight: 0, pos: [...w.bomber.pos] }
+      : null;
+    if (bomberTarget) {
+      if (w.nextBomberVolleyTick >= 1e9) w.nextBomberVolleyTick = w.tick + 360;
+      if (w.tick >= w.nextBomberVolleyTick) {
+        if (w.missiles.length < 10) spawnDefenseVolley(w, bomberTarget);
+        else w.nextBomberVolleyTick = w.tick + 120;
+      }
+    }
+    const superTarget = w.tanks.find((t) => t.alive && w.brains.get(t.id)?.kind === 'super');
+    if (superTarget) {
+      if (w.nextSuperVolleyTick >= 1e9) w.nextSuperVolleyTick = w.tick + 480;
+      if (w.tick >= w.nextSuperVolleyTick) {
+        const target: MissileTarget = {
+          kind: 'tank', id: superTarget.id, weight: 0, pos: [superTarget.x, 1, superTarget.z],
+        };
+        if (w.missiles.length < 10) spawnDefenseVolley(w, target);
+        else w.nextSuperVolleyTick = w.tick + 120;
+      }
     }
   }
   stepMissiles(w);
