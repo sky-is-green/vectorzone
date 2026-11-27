@@ -49,7 +49,7 @@ DORMANT ──► RUMBLE ──► ERUPT ──► COOLDOWN ──► DORMANT
   real sim projectiles** arc across the arena during a 10 s sustained eruption:
   - Each target gets a **fading-in ground ring ~2 s before impact** (the universal hazard telegraph).
   - Impact: **7 m blast radius / 6 damage**, then a **6–8 m lava pool lasting
-    40 s** (2 damage every 0.5 s); 35% of impacts also deposit fresh rock cover.
+    40 s** (2 damage every 0.5 s) with a persistent flashing-red hazard ring; 35% of impacts also deposit fresh rock cover.
     The battlefield literally rearranges itself and stays deadly.
 - **COOLDOWN**: fading glow, drifting ash across the arena, embers dying out.
 

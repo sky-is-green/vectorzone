@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createWorld, stepWorld } from './world';
-import { MATCH_TICKS, VOLCANO_FINAL_TICKS } from './combat';
+import { MATCH_TICKS, VOLCANO_FINAL_TICKS, LAVA_TICKS } from './combat';
+import { bombAftermath } from './volcano';
 import type { TankCommand } from './tank';
 
 const N: TankCommand = { throttle: 0, turn: 0, turretYaw: 0, gunPitch: 0, fire: false };
@@ -50,6 +51,19 @@ describe('match clock & volcano (user direction 2026-11-25)', () => {
     for (const s of w.structures.filter((s) => s.kind === 'rocks')) {
       expect(s.grid.cells.some((c) => c)).toBe(true);
     }
+  });
+
+  it('keeps lava pools and their hazard state for the full lifetime', () => {
+    const w = idleWorld();
+    w.tanks[0].x = 100;
+    w.tanks[0].z = 100;
+    bombAftermath(w, 0, 0, 'volcano');
+    expect(w.lavaPools).toHaveLength(1);
+    expect(w.lavaPools[0].untilTick).toBe(w.tick + LAVA_TICKS);
+    for (let i = 0; i < LAVA_TICKS - 1; i++) stepWorld(w, [N]);
+    expect(w.lavaPools).toHaveLength(1);
+    stepWorld(w, [N]);
+    expect(w.lavaPools).toHaveLength(0);
   });
 
   it('match ends at 10 minutes', () => {

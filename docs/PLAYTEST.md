@@ -75,6 +75,7 @@ tuning. A milestone with an un-run play-test is not fully done (BUILD.md §3).
 | F14 | 2026-11-27 | Ambient sky | Distant AA launches behind the 620 m mountains, flies upward ~1 s, and bursts with radial strokes/sparks only; stats show active AA count | Confirm launches appear behind the ridge, no horizontal explosion bar or circle remains, and `aa N` is nonzero in the live build | **open — awaiting human session** |
 | F8 | 2026-11-26 | Spectator | Added persistent KILLED BY label, wreck-first death camera, stationary focus shift to a living killer, then spectator; bomber/missile/environment attribution is distinct | Die to bomber, missile, and tank; confirm label stays through deathcam, camera position does not jump to killer, then lower-center spectator controls work | **open — awaiting human session** |
 | F15 | 2026-11-27 | Match end | Ambient AA previously continued after game over; updates now stop and active shells clear | Finish a match; confirm no new AA tracers/bursts appear after results | **open — awaiting human session** |
+| F16 | 2026-11-27 | Lava markers | Incoming volcano ring disappeared at impact while the pool ring was too subtle; pool rings are now persistent flashing-red markers | Let volcanic bombs land; confirm the red marker remains and pulses for the full 40 s lava lifetime | **open — awaiting human session** |
 
 ## Rule
 

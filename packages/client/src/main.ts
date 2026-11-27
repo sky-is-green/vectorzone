@@ -145,7 +145,7 @@ let rubbleRev = -1;
 const chunkGroups = new Map<number, LineSegments2>();
 const fenceGroups = new Map<number, LineSegments2>();
 const fenceMat = makeLineMaterial(0x39ff6b, 1.2, { transparent: true, opacity: 0.6 });
-const lavaMat = makeLineMaterial(0xff6b2b, 1.8, { transparent: true, opacity: 0.75 });
+const lavaMat = makeLineMaterial(0xff4433, 2.2, { transparent: true, opacity: 0.75 });
 const lavaLines = makeFatLinesFromPositions(new Float32Array(6), lavaMat);
 scene.add(lavaLines);
 let lavaKey = '';
@@ -809,8 +809,9 @@ function frame(now: number): void {
   }
   shakeAmp *= Math.exp(-dt * 6);
 
-  // lava pools: one thick-line mesh (rebuilt only when pools change), plus
-  // sparse rising embers. Never spawn hundreds of ring particles per frame.
+  // lava pools: one persistent flashing-red hazard-ring mesh (rebuilt only
+  // when pools change), plus sparse rising embers. The marker remains for the
+  // full pool lifetime instead of disappearing with the incoming telegraph.
   const key = world.lavaPools.map((p) => `${p.x.toFixed(1)},${p.z.toFixed(1)},${p.radius.toFixed(1)},${p.untilTick}`).join('|');
   if (key !== lavaKey) {
     lavaKey = key;
@@ -831,7 +832,7 @@ function frame(now: number): void {
     updateFatLinesFromArray(lavaLines, pos.length ? pos : new Float32Array(6));
     lavaLines.visible = world.lavaPools.length > 0;
   }
-  lavaMat.opacity = 0.55 + 0.25 * Math.sin(now / 180);
+  lavaMat.opacity = 0.4 + 0.6 * (0.5 + 0.5 * Math.sin(now / 180));
   emberAcc += dt;
   while (emberAcc > 0.12 && world.lavaPools.length) {
     emberAcc -= 0.12;
