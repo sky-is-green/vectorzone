@@ -106,9 +106,10 @@ Everything above lives in the shared sim, seeded → identical on host and clien
 - **Faster investigation and engagement**, but still no firing without visual confirmation.
 - **Point defense**: close missiles targeting a supertank trigger machine-gun
   tracer fire and a guaranteed intercept before impact, including the small/fast
-  defense volleys. The first three tracer rounds deliberately miss with
-  decreasing error; the fourth uses the corrected firing solution. There is no
-  muzzle flare, and the bursts do not create radar reveals or self-damage.
+  defense volleys. Projectiles use the same rendering as tank shells, only
+  thinner. The first three tracer rounds deliberately miss with decreasing
+  error; the fourth uses the corrected firing solution. There is no muzzle
+  flare, and the bursts do not create radar reveals or self-damage.
 - More aggressive advance/cover/orbit timing; same human-like aim limits.
 - Still bound by every fairness rule above — beatable by movement, cover play, and focus fire.
 
@@ -123,9 +124,9 @@ Less saucer, more bomber — the default in **every** mode. Every **2 minutes**,
 - **Bombs deny its flight path** on a cadence (~0.75 s between drops), plus opportunistic drops on any tank beneath it. Each drop is telegraphed by the universal ground ring (≥1.5 s).
 - **The information trap**: it's worth bonus points, but **shooting it pings your position** — a ~3 s radar blip visible to every player, and a memory refresh for every AI (in solo, the ping feeds the AI). The points piñata that tells everyone where you are.
 - **Point defense**: missiles targeting the bomber trigger earlier, longer-range
-  machine-gun tracer fire than the supertank's. The first three rounds miss
-  wide and walk onto the target; the fourth corrected tracer intercepts. The
-  bomber always wins, including 3–5 missile defense volleys during a bombing
+  machine-gun tracer fire than the supertank's. Projectiles match tank-shell
+  tracers at a thinner width. The first three rounds miss wide and walk onto
+  the target; the fourth corrected tracer intercepts. The bomber always wins, including 3–5 missile defense volleys during a bombing
   run. There is no muzzle flare, and the tracers do not reveal it on radar.
 - A few hits kill it (first hit claims the bonus); otherwise it despawns on exit. **Radar-invisible until it fires** — each bomb drop blips its position under the universal gunfire rule, so you can hunt it by its own bombs.
 

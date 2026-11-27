@@ -73,6 +73,6 @@ It is now a real simulated projectile stream:
 - A timer remains only as a last-resort guarantee.
 - Client rendering draws the moving tracer rounds and removes muzzle flare.
 
-Browser: two in-flight correction rounds rendered as distinct yellow tracer
+Browser: two in-flight correction rounds rendered as thinner tank-style tracer
 streaks with no muzzle burst. The regression test confirms shots 1–3 are
 non-lethal, shot 4 is live, and the intercept occurs before the timed fallback.

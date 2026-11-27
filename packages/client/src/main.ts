@@ -30,6 +30,7 @@ import {
   type SimEvent,
   type TankCommand,
 } from '@vectorzone/sim';
+import { AmbientAa } from './aa';
 import { buildEntityGeometry } from './geometry';
 import { createHud } from './hud';
 import { bindInput, readCommand } from './input';
@@ -323,6 +324,7 @@ const tint = {
   scorch: [0.45, 0.22, 0.08] as number[],
   smoke: [0.1, 0.35, 0.16] as number[],
 };
+const aa = new AmbientAa();
 
 function applySettings(s: Settings): void {
   if (s.map !== settings.map) {
@@ -409,6 +411,7 @@ const debug: { cam: { p: [number, number, number]; l: [number, number, number] }
   world,
   renderer,
   debug,
+  aa,
   camera,
   turretObj: turret.group,
   // synchronous sim stepping for deterministic browser probes (wall-time
@@ -549,6 +552,44 @@ function frame(now: number): void {
   scen.volcanoMat.color.setHex(
     vs === 'erupt' ? 0xff6b2b : vs === 'rumble' ? 0x8a4a20 : PALETTES[settings.palette % PALETTES.length].dim,
   );
+  for (const event of aa.update(dt)) {
+    if (event.kind === 'tracer') {
+      smoke.spawn(
+        event.pos[0], event.pos[1], event.pos[2],
+        event.dir[0] * 80, event.dir[1] * 80, event.dir[2] * 80,
+        0.08, tint.tracer[0], tint.tracer[1], tint.tracer[2], 2.4,
+      );
+    } else {
+      // Distant airburst: bright flash, ring, and radial sparks. All pooled.
+      smoke.spawn(
+        event.pos[0], event.pos[1], event.pos[2],
+        0, 0, 0,
+        0.28, 1, 0.9, 0.55, 10,
+        1, 0, 0,
+      );
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2;
+        smoke.spawn(
+          event.pos[0] + Math.sin(a) * 3, event.pos[1], event.pos[2] + Math.cos(a) * 3,
+          0, 0, 0,
+          0.65, tint.hazard[0], tint.hazard[1], tint.hazard[2], 1.8,
+          Math.cos(a), 0, -Math.sin(a),
+        );
+      }
+      for (let i = 0; i < 18; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const y = (Math.random() - 0.5) * 2;
+        const speed = 8 + Math.random() * 10;
+        smoke.spawn(
+          event.pos[0], event.pos[1], event.pos[2],
+          Math.sin(a) * speed, y * speed, Math.cos(a) * speed,
+          0.7 + Math.random() * 0.45,
+          tint.hazard[0], tint.hazard[1], tint.hazard[2],
+          1 + Math.random() * 1.1,
+        );
+      }
+    }
+  }
   smoke.update(dt);
 
   // --- M3 sync: structures, rubble, chunks, dead tank ------------------------
@@ -663,13 +704,11 @@ function frame(now: number): void {
     }
   }
   for (const shot of world.defenseShots) {
-    // Actual point-defense projectiles: no muzzle flare, just readable tracer
-    // rounds travelling through the world.
+    // Same tracer rendering as tank shells, only thinner. No muzzle particles.
     smoke.spawn(
       shot.pos[0], shot.pos[1], shot.pos[2],
-      0, 0, 0,
-      0.07, 1, 0.82, 0.28, 2.2,
-      shot.dir[0], shot.dir[1], shot.dir[2],
+      shot.dir[0] * 60, shot.dir[1] * 60, shot.dir[2] * 60,
+      0.06, tint.tracer[0], tint.tracer[1], tint.tracer[2], 1.3,
     );
   }
   if (world.bomber) {

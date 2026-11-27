@@ -65,6 +65,14 @@ DORMANT ──► RUMBLE ──► ERUPT ──► COOLDOWN ──► DORMANT
 - **Meteor shower**: streaks across the sky; rarely, one real meteorite lands with the same telegraph ring, depositing a destructible crystal/rock cluster and a small impact blast.
 - **Ion storm**: aurora-like waving line bands in the sky, horizon flicker, **radar static for 6–8 s** with an audio cue. No damage — an informational handicap that forces eyes-up play. Rare, and off by default in competitive deathmatch.
 
+### 3.4 Ambient distant AA fire
+
+- Purely visual client-side volleys of 2–4 tracers cross the far horizon every
+  5–11 s, with occasional distant airbursts.
+- Trajectories remain outside the playable arena and at sky altitude; they
+  never damage tanks, create radar contacts, or shake the camera.
+- Uses the existing particle pool only—no extra meshes, materials, or sim state.
+
 ---
 
 ## 4. Arena objects: the taxonomy
