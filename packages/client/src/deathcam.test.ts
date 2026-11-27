@@ -4,10 +4,20 @@ import {
   DEATH_EXPLOSION_MS,
   DEATH_KILLER_MS,
   DEATH_SOLO_FOCUS_MS,
+  killedByLabel,
   updateDeathCam,
 } from './deathcam';
 
 describe('death camera sequence', () => {
+  it('labels AI, missile, bomber, and environmental kills distinctly', () => {
+    expect(killedByLabel({ by: 3, source: 'shell', killerKind: 'slow' })).toBe('AI-3');
+    expect(killedByLabel({ by: 4, source: 'shell', killerKind: 'super' })).toBe('SUPERTANK AI-4');
+    expect(killedByLabel({ by: null, source: 'missile' })).toBe('MISSILE');
+    expect(killedByLabel({ by: 800, source: 'bomb' })).toBe('BOMBER');
+    expect(killedByLabel({ by: null, source: 'volcano' })).toBe('VOLCANO');
+    expect(killedByLabel({ by: null, cause: 'selfDestruct' })).toBe('SELF-DESTRUCT');
+  });
+
   it('shows the wreck first, then a living killer, then spectator', () => {
     const start = beginDeathCam(1000, [1, 1, 2], 7, 50);
     expect(start.stage).toBe('explosion');

@@ -6,11 +6,30 @@ export interface DeathCamState {
   pos: [number, number, number];
   killerId: number | null;
   bomberId: number | null;
+  focusPos?: [number, number, number];
 }
 
 export const DEATH_EXPLOSION_MS = 900;
 export const DEATH_KILLER_MS = 1400;
 export const DEATH_SOLO_FOCUS_MS = 2200;
+
+export interface DeathLabelInput {
+  by: number | null;
+  cause?: 'core' | 'selfDestruct';
+  source?: 'shell' | 'ammo' | 'missile' | 'bomb' | 'volcano' | 'meteor' | 'selfDestruct';
+  killerKind?: string;
+}
+
+export function killedByLabel(input: DeathLabelInput): string {
+  if (input.cause === 'selfDestruct' || input.source === 'selfDestruct') return 'SELF-DESTRUCT';
+  if (input.source === 'missile') return 'MISSILE';
+  if (input.source === 'bomb') return 'BOMBER';
+  if (input.source === 'volcano') return 'VOLCANO';
+  if (input.source === 'meteor') return 'METEOR';
+  if (input.source === 'ammo') return 'AMMO EXPLOSION';
+  if (input.by !== null) return input.killerKind === 'super' ? `SUPERTANK AI-${input.by}` : `AI-${input.by}`;
+  return 'THE ZONE';
+}
 
 export function beginDeathCam(
   now: number,

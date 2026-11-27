@@ -101,6 +101,7 @@ export interface World {
   respawnTick: number;
   nextLifeAt: number;
   lastHitBy: Map<number, number | null>;
+  lastHitSource: Map<number, 'shell' | Blast['source']>;
 }
 
 export const TICK_RATE = 60;
@@ -150,6 +151,7 @@ export function createWorld(seed: number, map: MapId = 'classic'): World {
     respawnTick: 0,
     nextLifeAt: 10000,
     lastHitBy: new Map(),
+    lastHitSource: new Map(),
   };
 }
 
@@ -193,20 +195,25 @@ const dist = (a: V3, b: V3): number => Math.hypot(a[0] - b[0], a[1] - b[1], a[2]
 
 type Damaged = Map<BlockGrid, GridCtx>;
 
-function destroyCell(w: World, ctx: GridCtx, c: V3, damaged: Damaged, by: number | null): void {
+function destroyCell(w: World, ctx: GridCtx, c: V3, damaged: Damaged, by: number | null, source: 'shell' | Blast['source'] = 'shell'): void {
   const b = getCell(ctx.g, c[0], c[1], c[2]);
   if (!b) return;
   const wp = cellWorld(ctx, c);
   setCell(ctx.g, c[0], c[1], c[2], null);
   damaged.set(ctx.g, ctx);
-  if (ctx.tank && by !== null) {
-    w.threats.set(ctx.tank.id, { tick: w.tick, from: by });
-    w.lastHitBy.set(ctx.tank.id, by);
-    recordIncomingFire(w, ctx.tank.id, by);
+  if (ctx.tank) {
+    w.lastHitSource.set(ctx.tank.id, source);
+    if (by !== null) {
+      w.threats.set(ctx.tank.id, { tick: w.tick, from: by });
+      w.lastHitBy.set(ctx.tank.id, by);
+      recordIncomingFire(w, ctx.tank.id, by);
+    } else {
+      w.lastHitBy.set(ctx.tank.id, null);
+    }
   }
   w.events.push({ kind: 'blockDestroyed', pos: wp, by });
   if (b.type === 'ammo') {
-    w.pendingExplosions.push({ pos: wp, radius: EXPLOSION_RADIUS, damage: EXPLOSION_DAMAGE, source: 'ammo' });
+    w.pendingExplosions.push({ pos: wp, radius: EXPLOSION_RADIUS, damage: EXPLOSION_DAMAGE, source: 'ammo', by });
   }
   for (const n of [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]] as V3[]) {
     const nc: V3 = [c[0] + n[0], c[1] + n[1], c[2] + n[2]];
@@ -214,21 +221,26 @@ function destroyCell(w: World, ctx: GridCtx, c: V3, damaged: Damaged, by: number
     if (!nb) continue;
     nb.hp -= SPLASH_DAMAGE;
     damaged.set(ctx.g, ctx);
-    if (nb.hp <= 0) destroyCell(w, ctx, nc, damaged, by);
+    if (nb.hp <= 0) destroyCell(w, ctx, nc, damaged, by, source);
   }
 }
 
-function damageCell(w: World, ctx: GridCtx, c: V3, dmg: number, damaged: Damaged, by: number | null): void {
+function damageCell(w: World, ctx: GridCtx, c: V3, dmg: number, damaged: Damaged, by: number | null, source: 'shell' | Blast['source'] = 'shell'): void {
   const b = getCell(ctx.g, c[0], c[1], c[2]);
   if (!b) return;
   b.hp -= dmg;
   damaged.set(ctx.g, ctx);
-  if (ctx.tank && by !== null) {
-    w.threats.set(ctx.tank.id, { tick: w.tick, from: by });
-    w.lastHitBy.set(ctx.tank.id, by);
-    recordIncomingFire(w, ctx.tank.id, by);
+  if (ctx.tank) {
+    w.lastHitSource.set(ctx.tank.id, source);
+    if (by !== null) {
+      w.threats.set(ctx.tank.id, { tick: w.tick, from: by });
+      w.lastHitBy.set(ctx.tank.id, by);
+      recordIncomingFire(w, ctx.tank.id, by);
+    } else {
+      w.lastHitBy.set(ctx.tank.id, null);
+    }
   }
-  if (b.hp <= 0) destroyCell(w, ctx, c, damaged, by);
+  if (b.hp <= 0) destroyCell(w, ctx, c, damaged, by, source);
 }
 
 // --- shells ----------------------------------------------------------------
@@ -272,7 +284,10 @@ function stepShells(w: World, damaged: Damaged): void {
       const b = getCell(cand.ctx.g, cand.cell[0], cand.cell[1], cand.cell[2]);
       if (!b) continue; // already destroyed earlier along this segment
       const wp = cellWorld(cand.ctx, cand.cell);
-      if (cand.ctx.tank) w.lastHitBy.set(cand.ctx.tank.id, sh.owner);
+      if (cand.ctx.tank) {
+        w.lastHitBy.set(cand.ctx.tank.id, sh.owner);
+        w.lastHitSource.set(cand.ctx.tank.id, 'shell');
+      }
       const cost = PEN_COST[b.type];
       if (sh.budget < cost) {
         damageCell(w, cand.ctx, cand.cell, 1, damaged, sh.owner);
@@ -314,7 +329,7 @@ function stepExplosions(w: World, damaged: Damaged): void {
             if (!getCell(ctx.g, x, y, z)) continue;
             const c: V3 = [x, y, z];
             if (dist(cellWorld(ctx, c), blast.pos) <= blast.radius) {
-              damageCell(w, ctx, c, blast.damage, damaged, blast.by ?? null);
+              damageCell(w, ctx, c, blast.damage, damaged, blast.by ?? null, blast.source);
             }
           }
         }
@@ -372,7 +387,7 @@ function stepIntegrity(w: World, damaged: Damaged): void {
       if (ctx.tank && ctx.part === 'hull') {
         ctx.tank.alive = false;
         const by = w.lastHitBy.get(ctx.tank.id) ?? null;
-        w.events.push({ kind: 'tankKilled', id: ctx.tank.id, pos: [ctx.tank.x, 1, ctx.tank.z], by, cause: 'core' });
+        w.events.push({ kind: 'tankKilled', id: ctx.tank.id, pos: [ctx.tank.x, 1, ctx.tank.z], by, cause: 'core', source: w.lastHitSource.get(ctx.tank.id) ?? 'shell' });
         if (ctx.tank.id === 0) {
           w.lives--;
           if (w.lives <= 0) w.phase = 'over';
@@ -415,7 +430,7 @@ function stepSelfDestruct(w: World, damaged: Damaged): void {
       damaged.set(g, ctx);
     }
     t.alive = false;
-    w.events.push({ kind: 'tankKilled', id: t.id, pos: [t.x, 1, t.z], by: null, cause: 'selfDestruct' });
+    w.events.push({ kind: 'tankKilled', id: t.id, pos: [t.x, 1, t.z], by: null, cause: 'selfDestruct', source: 'selfDestruct' });
     if (t.id === 0) {
       w.lives--;
       if (w.lives <= 0) w.phase = 'over';
@@ -559,7 +574,7 @@ export function stepWorld(w: World, commands: TankCommand[] = []): void {
               if (getCell(t.hull, x, y, z)) occupied.push([x, y, z]);
         if (occupied.length) {
           const c = occupied[Math.floor(w.rng.next() * occupied.length)];
-          damageCell(w, { g: t.hull, tank: t, part: 'hull' }, c, 2, damaged, null);
+          damageCell(w, { g: t.hull, tank: t, part: 'hull' }, c, 2, damaged, null, 'volcano');
         }
       }
     }

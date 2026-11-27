@@ -42,7 +42,7 @@ import { buildPanel, loadSettings, saveSettings, type Settings } from './setting
 import { pulseProgress, radarBearing, radarViewHeading } from './radar';
 import { livingSpectators, nextSpectatorId, spectatorLabel } from './spectator';
 import { explosionShake, impactShake } from './feedback';
-import { beginDeathCam, updateDeathCam, type DeathCamState } from './deathcam';
+import { beginDeathCam, killedByLabel, updateDeathCam, type DeathCamState } from './deathcam';
 import './style.css';
 
 const PHOSPHOR = 0x39ff6b;
@@ -84,6 +84,7 @@ let tank = world.tanks[0];
 let spectatedId: number | null = null;
 let lastKillerId: number | null = null;
 let deathCam: DeathCamState | null = null;
+let deathLabel: string | null = null;
 
 interface Body {
   group: THREE.Group;
@@ -431,6 +432,9 @@ const debug: { cam: { p: [number, number, number]; l: [number, number, number] }
   get deathStage() {
     return deathCam?.stage ?? null;
   },
+  get deathLabel() {
+    return deathLabel;
+  },
   post,
   scene,
   command: readCommand,
@@ -511,7 +515,10 @@ function frame(now: number): void {
     accumulator = 0;
   }
   tank = world.tanks[0];
-  if (tank.alive) deathCam = null;
+  if (tank.alive) {
+    deathCam = null;
+    deathLabel = null;
+  }
 
   refreshBody(hull, tank.hull);
   refreshBody(turret, tank.turret);
@@ -892,6 +899,12 @@ function frame(now: number): void {
       if (ev.id === 0) {
         lastKillerId = ev.by;
         deathCam = beginDeathCam(now, ev.pos, ev.by, world.bomber?.id ?? null);
+        deathLabel = `KILLED BY: ${killedByLabel({
+          by: ev.by,
+          cause: ev.cause,
+          source: ev.source,
+          killerKind: ev.by === null ? undefined : world.brains.get(ev.by)?.kind,
+        })}`;
         spectatedId = null;
         killfeed.push({ text: ev.cause === 'selfDestruct' ? 'YOU SELF-DESTRUCTED' : ev.by === null ? 'THE ZONE KILLED YOU' : 'ENEMY KILLED YOU', born: now });
       } else if (ev.cause === 'selfDestruct') {
@@ -969,12 +982,19 @@ function frame(now: number): void {
 
   const spectators = tank.alive ? [] : livingSpectators(world.tanks, 0);
   if (!tank.alive && deathCam) {
+    const previousStage = deathCam.stage;
     const killerId = deathCam.killerId;
     const killerAvailable = killerId !== null && (
       (world.bomber?.alive === true && world.bomber.id === killerId) ||
       spectators.some((t) => t.id === killerId)
     );
     deathCam = updateDeathCam(deathCam, now, killerAvailable);
+    if (previousStage === 'explosion' && deathCam.stage === 'killer' && !deathCam.focusPos) {
+      deathCam = {
+        ...deathCam,
+        focusPos: [camera.position.x, camera.position.y, camera.position.z],
+      };
+    }
   }
   const canSpectate = !deathCam || deathCam.stage === 'spectator';
   if (tank.alive) {
@@ -1012,25 +1032,16 @@ function frame(now: number): void {
     );
     camera.lookAt(deathCam.pos[0], deathCam.pos[1], deathCam.pos[2]);
   } else if (deathCam?.stage === 'killer') {
+    if (deathCam.focusPos) camera.position.set(...deathCam.focusPos);
     const killerId = deathCam.killerId;
     const killerBomber = world.bomber?.alive && world.bomber.id === killerId ? world.bomber : null;
     const killerTank = world.tanks.find((t) => t.alive && t.id === killerId);
     if (killerBomber) {
-      camera.position.set(
-        killerBomber.pos[0] - Math.sin(Math.atan2(killerBomber.dir[0], killerBomber.dir[2])) * 16,
-        killerBomber.pos[1] + 5,
-        killerBomber.pos[2] - Math.cos(Math.atan2(killerBomber.dir[0], killerBomber.dir[2])) * 16,
-      );
+      // Keep the death-camera position; only swing focus to the killer.
       camera.lookAt(killerBomber.pos[0], killerBomber.pos[1], killerBomber.pos[2]);
     } else if (killerTank) {
-      camera.position.set(
-        killerTank.x - Math.sin(killerTank.heading) * 12,
-        6.5,
-        killerTank.z - Math.cos(killerTank.heading) * 12,
-      );
       camera.lookAt(killerTank.x, 1.2, killerTank.z);
     } else {
-      camera.position.set(deathCam.pos[0] + 6, 4, deathCam.pos[2] + 6);
       camera.lookAt(deathCam.pos[0], deathCam.pos[1], deathCam.pos[2]);
     }
   } else if (!tank.alive && spectatedTank) {
@@ -1059,7 +1070,7 @@ function frame(now: number): void {
       .setFromRotationMatrix(turret.group.matrixWorld)
       .multiply(Q_HALF_TURN);
   }
-  if (settings.shake && shakeAmp > 0.001) {
+  if (settings.shake && shakeAmp > 0.001 && deathCam?.stage !== 'killer') {
     camera.position.x += (Math.random() - 0.5) * shakeAmp;
     camera.position.y += (Math.random() - 0.5) * shakeAmp;
     camera.position.z += (Math.random() - 0.5) * shakeAmp;
@@ -1149,6 +1160,7 @@ function frame(now: number): void {
       label: spectatorLabel(spectatedTank, world.brains.get(spectatedTank.id)?.kind),
       secondsLeft: Math.max(0, (world.respawnTick - world.tick) / 60),
     } : null,
+    deathcam: deathCam && deathCam.stage !== 'spectator' ? deathLabel : null,
     respawnReady: canSpectate && !tank.alive && world.respawnTick > 0 && world.tick >= world.respawnTick,
     now,
   });

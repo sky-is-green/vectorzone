@@ -46,6 +46,7 @@ export interface HudState {
   elevation: number;
   selfDestructSeconds: number | null;
   spectator: { label: string; secondsLeft: number } | null;
+  deathcam: string | null;
   respawnReady: boolean;
   now: number;
 }
@@ -264,6 +265,19 @@ export function createHud(): {
       ctx.beginPath();
       ctx.moveTo(rx - 6, ey); ctx.lineTo(rx + 6, ey);
       ctx.stroke();
+    }
+
+    // Deathcam label remains visible through wreck and killer focus.
+    if (s.deathcam) {
+      const deathY = Math.max(120, h * 0.24);
+      ctx.font = 'bold 16px monospace';
+      ctx.textAlign = 'center';
+      const width = ctx.measureText(s.deathcam).width;
+      ctx.fillStyle = hud + '20';
+      ctx.fillRect(w / 2 - width / 2 - 16, deathY - 22, width + 32, 32);
+      ctx.fillStyle = hud;
+      ctx.fillText(s.deathcam, w / 2, deathY);
+      ctx.textAlign = 'left';
     }
 
     // Spectator controls sit below the action, clear of the centered tank.

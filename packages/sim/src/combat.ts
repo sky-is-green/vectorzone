@@ -63,7 +63,7 @@ export type SimEvent =
   | { kind: 'blockDestroyed'; pos: V3; by: number | null }
   | { kind: 'explosion'; pos: V3; radius: number; damage: number; source: Blast['source'] | 'airburst' }
   | { kind: 'chunkDetached'; id: number }
-  | { kind: 'tankKilled'; id: number; pos: V3; by: number | null; cause?: 'core' | 'selfDestruct' }
+  | { kind: 'tankKilled'; id: number; pos: V3; by: number | null; cause?: 'core' | 'selfDestruct'; source?: 'shell' | Blast['source'] }
   | { kind: 'selfDestructArmed'; id: number; pos: V3; seconds: number }
   | { kind: 'kill'; id: number; what: 'missile' | 'bomber'; by: number | null }
   | { kind: 'scanPing' }

@@ -193,7 +193,14 @@ describe('missile point defense', () => {
     w.telegraphs = [];
     w.pendingExplosions.push({ pos: [0, 0.5, 0], radius: 10, damage: 99, source: 'bomb', by: 800 });
     stepWorld(w, [N]);
-    expect(w.events.some((e) => e.kind === 'tankKilled' && e.id === 0 && e.by === 800)).toBe(true);
+    expect(w.events.some((e) => e.kind === 'tankKilled' && e.id === 0 && e.by === 800 && e.source === 'bomb')).toBe(true);
+  });
+
+  it('labels missile deaths separately from environmental deaths', () => {
+    const w = quietWorld();
+    w.pendingExplosions.push({ pos: [0, 0.5, 0], radius: 10, damage: 99, source: 'missile', by: null });
+    stepWorld(w, [N]);
+    expect(w.events.some((e) => e.kind === 'tankKilled' && e.id === 0 && e.by === null && e.source === 'missile')).toBe(true);
   });
 
   it('self-heals an unscheduled manually introduced bomber', () => {
