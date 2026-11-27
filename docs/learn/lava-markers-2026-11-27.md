@@ -19,3 +19,6 @@ thin, and visually subtle, so the hazard marker appeared to disappear.
   pulsed between roughly 0.39 and 0.89 opacity before the minimum was raised to
   0.4 for readability. Zero console errors.
 - Full gate: 180 tests; 158.7 KB gzipped.
+- Live deployment `e02d255` built successfully; cache-busted URL served
+  `index-DZMtSLhI.js` with one pool, zero telegraphs, and the red marker active.
+  Zero console errors.
