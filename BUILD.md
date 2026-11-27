@@ -114,6 +114,7 @@ vectorzone/
 7. **Human play-test (feel gate)** at M1, M3, M5, M7, M8 and after any controls/camera/tuning change: run `docs/PLAYTEST.md` with a human; record results in `docs/learn/playtest-<date>.md`. Automated probes verify mechanics, never feel. Feel issues are logged with hypotheses and resolved after human confirmation — not guessed fixes.
 8. Write `docs/learn/mN.md` (concepts, decisions, deviations).
 9. Commit: `M<n>: <imperative summary>`; tick the checklist in this file.
+10. After a `gh-pages` push, verify the GitHub Pages build for that commit is `built`, then confirm the served `index.html` references the expected hashed asset. Pages HTML is CDN-cached for up to 10 minutes, so an immediate fetch can still show the previous build.
 
 **Any red gate → fix before proceeding.**
 
