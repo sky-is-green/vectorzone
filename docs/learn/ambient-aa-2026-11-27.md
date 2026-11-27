@@ -15,14 +15,14 @@ small to confirm.
 ## Continuous implementation
 
 - `AmbientAa` remains a small client-only state machine with injectable RNG.
-- Volleys of 2–3 shells launch from ground level every 0.7–1.8 s at 230–300 m
-  horizontal radius, fly upward for 0.9–1.2 s, then explode in the sky.
+- Volleys of 2–3 shells launch from ground level behind the 620 m mountain ring
+  every 0.7–1.8 s, fly upward for 0.9–1.2 s, then explode above the ridge.
 - New volleys are biased into the current hull+turret view heading.
-- Upward trajectories keep fire outside the playable space.
+- Steep trajectories keep fire outside the playable space.
 - Shells emit tracer events, then a distant explosion event at end of life.
 - Rendering reuses the existing 1,024-segment particle pool: 7 m tracer streaks,
-  a longer flash, and 24 radial sparks. The circular burst ring was removed
-  because it read like a ground impact.
+  short radial flash strokes, and 24 radial sparks. The circular ring and long
+  horizontal flash bar were removed.
 - No sim entities, damage, radar reveals, camera shake, materials, or meshes are
   added.
 
@@ -36,8 +36,11 @@ Defense shots use the exact tank-shell tracer path and color, with a shorter
 - Seven `AmbientAa` tests: initial delay, ground launch/upward direction, volley
   size/distance, ~1 s explosion timing, recurrence, view bias, sustained 60 s
   activity, deterministic RNG.
-- Browser normal-camera probe: no debug camera; forced shells reported upward
-  direction and rose from ground level to about 6.7 m within 50 ms. A skyburst
-  at roughly `[-70, 96, 233]` rendered as an orange flash/spark cluster with no
-  circular ring. Zero console errors.
-- Full gate: 171 tests; 157.7 KB gzipped.
+- Browser normal-camera probe: launches were measured at 752 m radius behind the
+  620 m ridge, moving upward. A tracked skyburst at roughly `[61, 80, 720]`
+  rendered as a small star/spark cluster above the mountains with no circular
+  ring or horizontal bar. Zero console errors.
+- Live-bundle probe before this depth fix: current asset had AA active in 61/80
+  sampled frames with up to three shells, so the production code was running.
+  The stats readout now includes `aa N` to make stale-tab diagnosis explicit.
+- Full gate: 171 tests; 157.8 KB gzipped.

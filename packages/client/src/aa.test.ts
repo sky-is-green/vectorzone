@@ -16,7 +16,7 @@ describe('ambient distant AA fire', () => {
     expect(aa.update(0.05, rng(3))).toEqual([]);
   });
 
-  it('spawns 2-3 distant tracers', () => {
+  it('spawns 2-3 upward tracers behind the mountain ring', () => {
     const aa = new AmbientAa(rng(5));
     aa.forceVolley(rng(5));
     expect(aa.activeCount).toBeGreaterThanOrEqual(2);
@@ -28,7 +28,7 @@ describe('ambient distant AA fire', () => {
       if (e.kind === 'tracer') {
         expect(e.pos[1]).toBeLessThan(5);
         expect(e.dir[1]).toBeGreaterThan(0);
-        expect(Math.hypot(e.pos[0], e.pos[2])).toBeGreaterThan(180);
+        expect(Math.hypot(e.pos[0], e.pos[2])).toBeGreaterThan(650);
       }
     }
   });
@@ -43,8 +43,8 @@ describe('ambient distant AA fire', () => {
         if (e.kind === 'explosion') {
           if (firstExplosionAt < 0) firstExplosionAt = (i + 1) / 60;
           explosions++;
-          expect(e.pos[1]).toBeGreaterThan(25);
-          expect(Math.hypot(e.pos[0], e.pos[2])).toBeGreaterThan(180);
+          expect(e.pos[1]).toBeGreaterThan(60);
+          expect(Math.hypot(e.pos[0], e.pos[2])).toBeGreaterThan(650);
         }
       }
     }

@@ -24,6 +24,7 @@ export class AmbientAa {
   private shells: AaShell[] = [];
   private nextVolley: number;
   private recent: AaEvent[] = [];
+  private explosions = 0;
 
   constructor(rng: () => number = Math.random) {
     this.nextVolley = 0.15 + rng() * 0.35;
@@ -35,6 +36,10 @@ export class AmbientAa {
 
   get recentEvents(): readonly AaEvent[] {
     return this.recent;
+  }
+
+  get explosionCount(): number {
+    return this.explosions;
   }
 
   /** Useful for deterministic tests and the browser debug hook. */
@@ -52,8 +57,10 @@ export class AmbientAa {
       shell.pos[1] += shell.dir[1] * shell.speed * dt;
       shell.pos[2] += shell.dir[2] * shell.speed * dt;
       events.push({ kind: 'tracer', pos: [...shell.pos], dir: [...shell.dir] });
-      if (shell.age >= shell.life) events.push({ kind: 'explosion', pos: [...shell.pos] });
-      else live.push(shell);
+      if (shell.age >= shell.life) {
+        this.explosions++;
+        events.push({ kind: 'explosion', pos: [...shell.pos] });
+      } else live.push(shell);
     }
     this.shells = live;
     if (this.nextVolley <= 0) this.spawnVolley(rng, viewHeading);
@@ -68,17 +75,17 @@ export class AmbientAa {
     const bearing = viewHeading + (rng() - 0.5) * 1.2;
     for (let i = 0; i < count; i++) {
       const angle = bearing + (rng() - 0.5) * 0.3;
-      const radius = 230 + rng() * 70;
+      const radius = 700 + rng() * 100;
       const pos: AaVec = [
         Math.sin(angle) * radius,
         0.6 + rng() * 0.8,
         Math.cos(angle) * radius,
       ];
-      const targetAngle = angle + (rng() - 0.5) * 0.9;
-      const targetRadius = 220 + rng() * 80;
+      const targetAngle = angle + (rng() - 0.5) * 0.35;
+      const targetRadius = radius + (rng() - 0.5) * 80;
       const target: AaVec = [
         Math.sin(targetAngle) * targetRadius,
-        85 + rng() * 45,
+        160 + rng() * 80,
         Math.cos(targetAngle) * targetRadius,
       ];
       const dir = norm([target[0] - pos[0], target[1] - pos[1], target[2] - pos[2]]);

@@ -560,13 +560,18 @@ function frame(now: number): void {
         0.18, tint.tracer[0], tint.tracer[1], tint.tracer[2], 7,
       );
     } else {
-      // Distant skyburst: bright flash and radial sparks, no ground-impact ring.
-      smoke.spawn(
-        event.pos[0], event.pos[1], event.pos[2],
-        0, 0, 0,
-        0.45, 1, 0.9, 0.55, 20,
-        1, 0, 0,
-      );
+      // Distant skyburst: short radial strokes and sparks, no ring or horizon bar.
+      for (let i = 0; i < 10; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const y = (Math.random() - 0.5) * 2;
+        const l = Math.hypot(Math.sin(a), y, Math.cos(a)) || 1;
+        smoke.spawn(
+          event.pos[0], event.pos[1], event.pos[2],
+          0, 0, 0,
+          0.28, 1, 0.9, 0.55, 3 + Math.random() * 2,
+          Math.sin(a) / l, y / l, Math.cos(a) / l,
+        );
+      }
       for (let i = 0; i < 24; i++) {
         const a = Math.random() * Math.PI * 2;
         const y = (Math.random() - 0.5) * 2;
@@ -1103,7 +1108,7 @@ function frame(now: number): void {
     frames = 0;
     fpsWindow = 0;
   }
-  stats.textContent = `FPS ${fps} · calls ${renderer.info.render.calls} · tick ${world.tick} · v ${tank.speed.toFixed(1)} m/s · ${chase ? 'chase' : 'scope'} [C]`;
+  stats.textContent = `FPS ${fps} · calls ${renderer.info.render.calls} · tick ${world.tick} · v ${tank.speed.toFixed(1)} m/s · aa ${aa.activeCount} · ${chase ? 'chase' : 'scope'} [C]`;
 }
 requestAnimationFrame(frame);
 

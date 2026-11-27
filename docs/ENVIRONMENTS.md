@@ -68,12 +68,13 @@ DORMANT ──► RUMBLE ──► ERUPT ──► COOLDOWN ──► DORMANT
 ### 3.4 Ambient distant AA fire
 
 - Purely visual client-side volleys of 2–3 tracers launch from ground level
-  outside the arena every 0.7–1.8 s, fly upward for about one second, then
-  produce distant skybursts throughout the match.
-- New volleys are biased into the player's current view; trajectories remain
-  outside the playable space.
-- Longer tracer streaks and larger flash/spark bursts keep the action readable
-  from the normal ground camera. Skybursts intentionally have no circular ring.
+  behind the 620 m mountain ring every 0.7–1.8 s, fly upward for about one
+  second, then produce distant skybursts throughout the match.
+- New volleys are biased into the player's current view; steep trajectories
+  explode above the ridge rather than in front of the mountains.
+- Longer tracer streaks and short radial flash strokes keep the action readable
+  from the normal ground camera. Skybursts intentionally have no circular ring
+  or horizontal flash bar.
 - They never damage tanks, create radar contacts, or shake the camera, and use
   the existing particle pool only—no extra meshes, materials, or sim state.
 
