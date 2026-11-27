@@ -71,25 +71,24 @@ export class AmbientAa {
       const radius = 230 + rng() * 70;
       const pos: AaVec = [
         Math.sin(angle) * radius,
-        42 + rng() * 38,
+        0.6 + rng() * 0.8,
         Math.cos(angle) * radius,
       ];
       const targetAngle = angle + (rng() - 0.5) * 0.9;
       const targetRadius = 220 + rng() * 80;
       const target: AaVec = [
         Math.sin(targetAngle) * targetRadius,
-        48 + rng() * 35,
+        85 + rng() * 45,
         Math.cos(targetAngle) * targetRadius,
       ];
       const dir = norm([target[0] - pos[0], target[1] - pos[1], target[2] - pos[2]]);
-      const speed = 75 + rng() * 45;
-      const distance = Math.hypot(target[0] - pos[0], target[1] - pos[1], target[2] - pos[2]);
+      const speed = 85 + rng() * 35;
       this.shells.push({
         pos,
         dir,
         speed,
         age: 0,
-        life: (distance / speed) * (0.65 + rng() * 0.25),
+        life: 0.9 + rng() * 0.3,
       });
     }
     this.nextVolley = 0.7 + rng() * 1.1;

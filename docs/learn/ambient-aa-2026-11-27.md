@@ -15,13 +15,14 @@ small to confirm.
 ## Continuous implementation
 
 - `AmbientAa` remains a small client-only state machine with injectable RNG.
-- Volleys of 2–3 shells spawn every 0.7–1.8 s at 230–300 m horizontal radius and
-  42–80 m altitude.
+- Volleys of 2–3 shells launch from ground level every 0.7–1.8 s at 230–300 m
+  horizontal radius, fly upward for 0.9–1.2 s, then explode in the sky.
 - New volleys are biased into the current hull+turret view heading.
-- Tangential trajectories keep fire outside the playable space.
+- Upward trajectories keep fire outside the playable space.
 - Shells emit tracer events, then a distant explosion event at end of life.
 - Rendering reuses the existing 1,024-segment particle pool: 7 m tracer streaks,
-  a longer flash, a 16-segment burst ring, and 24 radial sparks.
+  a longer flash, and 24 radial sparks. The circular burst ring was removed
+  because it read like a ground impact.
 - No sim entities, damage, radar reveals, camera shake, materials, or meshes are
   added.
 
@@ -32,9 +33,11 @@ Defense shots use the exact tank-shell tracer path and color, with a shorter
 
 ## Verification
 
-- Seven `AmbientAa` tests: initial delay, volley size/distance, explosion cleanup,
-  recurrence, view bias, sustained 60 s activity, deterministic RNG.
-- Browser normal-camera probe: no debug camera, 38/60 sampled frames had active
-  tracers, up to three shells active, and the screenshot showed multiple orange
-  flak bursts across the horizon. Zero console errors.
-- Full gate: 171 tests; 157.8 KB gzipped.
+- Seven `AmbientAa` tests: initial delay, ground launch/upward direction, volley
+  size/distance, ~1 s explosion timing, recurrence, view bias, sustained 60 s
+  activity, deterministic RNG.
+- Browser normal-camera probe: no debug camera; forced shells reported upward
+  direction and rose from ground level to about 6.7 m within 50 ms. A skyburst
+  at roughly `[-70, 96, 233]` rendered as an orange flash/spark cluster with no
+  circular ring. Zero console errors.
+- Full gate: 171 tests; 157.7 KB gzipped.

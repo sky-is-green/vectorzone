@@ -26,19 +26,22 @@ describe('ambient distant AA fire', () => {
     for (const e of events) {
       expect(e.kind).toBe('tracer');
       if (e.kind === 'tracer') {
-        expect(e.pos[1]).toBeGreaterThan(30);
+        expect(e.pos[1]).toBeLessThan(5);
+        expect(e.dir[1]).toBeGreaterThan(0);
         expect(Math.hypot(e.pos[0], e.pos[2])).toBeGreaterThan(180);
       }
     }
   });
 
-  it('produces distant sky explosions and removes spent shells', () => {
+  it('produces distant sky explosions after about one second', () => {
     const aa = new AmbientAa(rng(9));
     aa.forceVolley(rng(9));
     let explosions = 0;
+    let firstExplosionAt = -1;
     for (let i = 0; i < 600 && aa.activeCount; i++) {
       for (const e of aa.update(1 / 60, rng(9))) {
         if (e.kind === 'explosion') {
+          if (firstExplosionAt < 0) firstExplosionAt = (i + 1) / 60;
           explosions++;
           expect(e.pos[1]).toBeGreaterThan(25);
           expect(Math.hypot(e.pos[0], e.pos[2])).toBeGreaterThan(180);
@@ -46,7 +49,9 @@ describe('ambient distant AA fire', () => {
       }
     }
     expect(explosions).toBeGreaterThanOrEqual(2);
-    expect(aa.activeCount).toBe(0);
+    expect(firstExplosionAt).toBeGreaterThanOrEqual(0.85);
+    expect(firstExplosionAt).toBeLessThanOrEqual(1.25);
+    expect(aa.activeCount).toBeLessThanOrEqual(3);
   });
 
   it('keeps recurring after a volley', () => {

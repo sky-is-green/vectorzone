@@ -560,22 +560,13 @@ function frame(now: number): void {
         0.18, tint.tracer[0], tint.tracer[1], tint.tracer[2], 7,
       );
     } else {
-      // Distant airburst: bright flash, ring, and radial sparks. All pooled.
+      // Distant skyburst: bright flash and radial sparks, no ground-impact ring.
       smoke.spawn(
         event.pos[0], event.pos[1], event.pos[2],
         0, 0, 0,
         0.45, 1, 0.9, 0.55, 20,
         1, 0, 0,
       );
-      for (let i = 0; i < 16; i++) {
-        const a = (i / 16) * Math.PI * 2;
-        smoke.spawn(
-          event.pos[0] + Math.sin(a) * 7, event.pos[1], event.pos[2] + Math.cos(a) * 7,
-          0, 0, 0,
-          0.9, tint.hazard[0], tint.hazard[1], tint.hazard[2], 3,
-          Math.cos(a), 0, -Math.sin(a),
-        );
-      }
       for (let i = 0; i < 24; i++) {
         const a = Math.random() * Math.PI * 2;
         const y = (Math.random() - 0.5) * 2;
